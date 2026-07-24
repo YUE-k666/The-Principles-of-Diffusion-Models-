@@ -1,0 +1,498 @@
+% !Mode:: "TeX:DE:UTF-8:Main"
+%
+% Pass xcolor table option BEFORE \documentclass so it takes effect when
+% the class loads pdfpages -> eso-pic -> xcolor.
+\PassOptionsToPackage{table}{xcolor}
+
+% \DocumentMetadata{
+%   lang        = en,
+%   pdfversion  = 2.0,
+%   pdfstandard = A-2b,
+%   testphase   = 
+%     {phase-III,
+%      title,
+%      table
+% 	}  
+% }
+
+%JOURNAL CODE  SEE DOCUMENTATION
+\documentclass[examplefnt,biber]{nowfnt-arxiv} % creates the journal version, needs biber version
+
+% ====== Chinese (Simplified) support for XeLaTeX ======
+\usepackage{xeCJK}
+\setCJKmainfont{Noto Serif CJK SC}[AutoFakeBold=true,AutoFakeSlant=true]
+\setCJKsansfont{Noto Sans CJK SC}[AutoFakeBold=true,AutoFakeSlant=true]
+\setCJKmonofont{Noto Sans CJK SC}
+\linespread{1.25}\selectfont
+
+% \usepackage{etoolbox}
+% \newcounter{absfn}
+% \makeatletter
+% \let\orig@footnotetext\@footnotetext
+% \long\def\@footnotetext#1{%
+%   \orig@footnotetext{\hypertarget{absfn.\theabsfn}{}#1}%
+% }
+% \let\orig@makefnmark\@makefnmark
+% \def\@makefnmark{%
+%   \stepcounter{absfn}%
+%   \hyperlink{absfn.\theabsfn}{\orig@makefnmark}%
+% }
+% \makeatother
+
+\usepackage{etoolbox}
+\newcounter{fnhyp}
+\AfterEndPreamble{\input{fnfix}}
+
+
+
+% \documentclass[examplefnt,biber]{nowfnt} 
+%wrapper for book and ebook are created automatically.
+% \PassOptionsToPackage{colorlinks=true}{hyperref}
+\PassOptionsToPackage{dvipsnames}{xcolor} % harmless on pdf engines
+\PassOptionsToPackage{table}{xcolor}      % must precede tikz load to avoid option clash
+
+
+
+
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc,positioning,shapes.geometric}
+% \usepackage{subfigure}
+\usepackage{subcaption}
+\usepackage{mathrsfs}
+\usepackage{tcolorbox}
+\usepackage{booktabs} % for professional tables
+\usetikzlibrary{positioning,calc,arrows.meta,shapes.geometric}
+
+
+\usepackage[labelfont={bf,sf}]{caption}
+\usetikzlibrary{shapes, arrows, positioning, backgrounds, shadows} % Added shadows
+\usepackage{stmaryrd}
+\usepackage{placeins} % in preamble
+\newcommand{\graymidrule}{\arrayrulecolor{black!25}\midrule\arrayrulecolor{black}}
+\usepackage{cancel}
+
+\newcommand{\ys}[1]{{\color{orange}{[YS: #1]}}}
+
+
+
+
+\captionsetup[table]{labelfont={bf,sf}}
+%%%%% For Math Box %%%%%%%
+\usepackage{mathtools}
+\usepackage{fancybox}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{amsmath, amssymb, amsfonts}
+% \usepackage{thmtools}
+\usepackage{graphicx}
+\usepackage{setspace}
+\usepackage{geometry}
+\usepackage{float}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{environ}
+\usepackage{xr}
+\usepackage{mwe}
+\usepackage{adjustbox} % <-- for max width scaling
+\usepackage{multirow}       % Also in the preamble
+\usepackage{makecell}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning}
+
+% \usepackage{ulem} %for \uwave
+\usepackage{annotate_eqs}
+\usetikzlibrary{positioning, arrows.meta, fit, shapes.multipart}
+
+
+
+% \usepackage[T1]{fontenc}
+% \usepackage{mathabx}
+\def\Circlearrowleft{\ensuremath{%
+  \rotatebox[origin=c]{180}{$\circlearrowleft$}}}
+\def\Circlearrowright{\ensuremath{%
+  \rotatebox[origin=c]{150}{$\circlearrowright$}}}
+\def\CircleArrowleft{\ensuremath{%
+  \reflectbox{\rotatebox[origin=c]{180}{$\circlearrowleft$}}}}
+\def\CircleArrowright{\ensuremath{%
+  \reflectbox{\rotatebox[origin=c]{180}{$\circlearrowright$}}}}
+
+\newtheorem*{lemma*}{Lemma}
+
+\renewcommand{\labelitemi}{\raisebox{.25\height}{\tiny$\blacksquare$}}
+\renewcommand{\labelitemii}{{$\bullet$}}
+
+
+% \usepackage{enumitem}
+% \setlist[itemize]{label=\rule[0.5ex]{0.6ex}{0.6ex}}
+% \usepackage{csquotes} % put this in your preamble
+\usepackage{epigraph} 
+\setlength{\epigraphwidth}{0.79\textwidth}
+\usepackage{thmbox}  % Load thmbox package
+\newtheorem[M]{question}{\sffamily\bfseries 问题}[section]
+\tcbuselibrary{theorems,skins,breakable}
+
+\newcommand{\cc}[1]{\cellcolor{gray!#1}}
+\newcommand{\textbfs}[1]{{\sffamily\textbf{#1}}}
+\usepackage{multicol}
+
+
+
+
+%%%%%%%%%%%%%%%%%%%
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\floatname{algorithm}{\textbfs{算法}}
+\DeclareCaptionFormat{bfsformat}{\textbfs{#1#2}#3}
+\captionsetup[algorithm]{format=bfsformat, labelfont=bf}
+\renewcommand{\algorithmicrequire}{\textbfs{输入：}}
+\renewcommand{\algorithmicensure}{\textbfs{输出：}}
+\renewcommand{\algorithmicfor}{\textbfs{for}}      
+\renewcommand{\algorithmicend}{\textbfs{end}} 
+\renewcommand{\algorithmicdo}{\textbfs{do}} 
+\renewcommand{\algorithmicrepeat}{\textbfs{Repeat}} 
+\renewcommand{\algorithmicuntil}{\textbfs{until}} 
+\renewcommand{\algorithmicreturn}{\textbfs{return}} 
+\renewcommand{\algorithmicif}{\textbfs{if}} 
+\renewcommand{\algorithmicelse}{\textbfs{else}}
+\renewcommand{\algorithmicthen}{\textbfs{then}}
+\renewcommand{\algorithmicwhile}{\textbfs{while}} 
+%%%%%%%%%%%%%%%%%%%%
+
+
+\usepackage{cleveref}
+\crefname{algorithm}{算法}{算法}
+
+\usepackage{subcaption}
+\usepackage{graphicx}
+%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\usepackage[framemethod=TikZ]{mdframed}
+\mdfsetup{%
+   middlelinecolor=black,
+   middlelinewidth=1.1pt,
+   backgroundcolor=gray!10,
+   roundcorner=6pt}
+\input{math_commands}
+\input{theorems}
+\renewcommand\thepart{\Alph{part}}
+
+%%%%%%%%%%%%%%%%% Checklist %%%%%%%%%%%%%%%%%
+\newlist{todolist}{itemize}{2}
+\setlist[todolist]{label=$\square$}
+\usepackage{pifont}
+\newcommand{\cmark}{\ding{51}}%
+\newcommand{\xmark}{\ding{55}}%
+\newcommand{\done}{\rlap{$\square$}{\raisebox{2pt}{\large\hspace{1pt}\cmark}}%
+\hspace{-2.5pt}}
+\newcommand{\wontfix}{\rlap{$\square$}{\large\hspace{1pt}\xmark}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\usepackage{pstricks}
+\usepackage{pstricks-add}
+
+% \usepackage{kotex}  % removed: hijacks xeCJK CJK fonts -> tofu boxes
+
+\DeclareRobustCommand{\figcredit}[2][Source]{%
+  \par\smallskip
+  \makebox[\linewidth][r]{\footnotesize\itshape #1: #2}%
+}
+% \usepackage[colorlinks=true,allcolors=blue,plainpages=false,pdfpagelabels=true]{hyperref}
+
+% \makeatletter
+% \def\cref@addtoreset#1#2{\@addtoreset{#1}{#2}}
+% \makeatother
+
+%ARTICLE TITLE
+\title{扩散模型的原理}
+
+
+%ARTICLE SUB-TITLE
+% \subtitle{From Origins to Advances}
+
+
+%AUTHORS FOR COVER PAGE 
+% separate authors by \and, item by \\
+% Don't use verbatim or problematic symbols.
+% _ in mail address should be entered as \_
+% Pay attention to large mail-addresses ...
+
+%if there are many author twocolumn mode can be activated.
+%\booltrue{authortwocolumn} %SEE DOCUMENTATION
+\maintitleauthorlist{
+Chieh-Hsin Lai \\
+Sony AI \\
+\and
+Yang Song\\
+OpenAI \\
+\and
+Dongjun Kim \\
+Stanford University \\
+\and
+Yuki Mitsufuji \\
+Sony Group Corporation, Sony AI \\
+\and
+Stefano Ermon \\
+Stanford University
+}
+
+%ISSUE DATA AS PROVIDED BY NOW
+\issuesetup
+{%
+ copyrightowner={Chieh-Hsin Lai, Yang Song, Dongjun Kim, Yuki Mitsufuji, and Stefano Ermon},
+ volume        = xx,
+ issue         = xx,
+ pubyear       = 2024,
+ isbn          = xxx-x-xxxxx-xxx-x,
+ eisbn         = xxx-x-xxxxx-xxx-x,
+ doi           = 10.1561/XXXXXXXXX,
+ firstpage     = 1, %Explain
+ lastpage      = 18
+ }
+
+%BIBLIOGRAPHY FILE
+%\addbibresource{sample.bib}
+%\addbibresource{testfnt.bib}
+\addbibresource{main_v2.bib}
+
+
+%AUTHORS FOR ABSTRACT PAGE
+\author[1]{Chieh-Hsin Lai}
+\author[2]{Yang Song}
+\author[3]{Dongjun Kim}
+\author[4]{Yuki Mitsufuji}
+\author[5]{Stefano Ermon}
+
+\affil[1]{Sony AI; \url{chieh-hsin.lai@sony.com} / \url{chiehhsinlai@gmail.com}}
+\affil[2]{OpenAI\footnote{Affiliation reflects the institution at the time of the work.}; \url{thusongyang@gmail.com}}
+\affil[3]{Stanford University; \url{dongjun@stanford.edu}}
+\affil[4]{Sony Group Corporation, Sony AI; \url{yuhki.mitsufuji@sony.com}}
+\affil[5]{Stanford University; \url{ermon@cs.stanford.edu}}
+
+\articledatabox{\nowfntstandardcitation}
+
+
+
+% \declaretheorem[style=remark, thmbox=M, name=Theorem]{theorem}
+
+\newcommand{\veryshortarrow}[1][3pt]{\mathrel{%
+   \hbox{\rule[\dimexpr\fontdimen22\textfont2-.2pt\relax]{#1}{.4pt}}%
+   \mkern-4mu\hbox{\usefont{U}{lasy}{m}{n}\symbol{41}}}}
+
+% ==========================================================
+% MIT Press forthcoming badge on the VERY FIRST cover page
+% Paste this block in the preamble, immediately before:
+%     \begin{document}
+% ==========================================================
+
+% ==========================================================
+% MIT Press forthcoming badge on the VERY FIRST cover page
+% Paste this block in the preamble, immediately before:
+%     \begin{document}
+% ==========================================================
+
+\usepackage{eso-pic}
+
+\definecolor{MITTagGold}{HTML}{B8872E}
+\definecolor{MITTagBrown}{HTML}{5A3518}
+\definecolor{MITTagCream}{HTML}{FFF4D8}
+\definecolor{MITTagOrange}{HTML}{D9982F}
+
+% ---- Easy layout knobs ----
+% More negative x = move tag left. More negative y = move tag down.
+\newcommand{\MITPressTagXShift}{-13mm}
+\newcommand{\MITPressTagYShift}{-13mm}
+
+% Positive value moves the existing cover title/authors DOWN.
+\newcommand{\CoverTitleDrop}{-5mm}
+
+\makeatletter
+\newif\ifMITPressTagFirstCover
+\MITPressTagFirstCovertrue
+
+\newcommand{\MITPressBadgeContent}{%
+  \begin{minipage}{6.2cm}
+    \centering
+    {\sffamily\bfseries\fontsize{7.2}{8.2}\selectfont
+     \color{MITTagGold!75!black} FORTHCOMING FROM}%
+    \hspace{0.32em}%
+    {\sffamily\bfseries\fontsize{11.4}{12.4}\selectfont
+     \color{MITTagBrown} MIT Press}%
+    {\sffamily\bfseries\fontsize{7.2}{8.2}\selectfont
+     \color{MITTagGold!75!black}, 2027}%
+  \end{minipage}%
+}
+
+\newcommand{\MITPressForthcomingTag}{%
+  \AddToShipoutPictureFG*{%
+    \begin{tikzpicture}[remember picture,overlay]
+
+      % Gray soft shadow only: no text, no boundary, slightly shifted.
+      \node[
+        anchor=north east,
+        xshift=\MITPressTagXShift,
+        yshift=\MITPressTagYShift,
+        rounded corners=7pt,
+        inner xsep=11pt,
+        inner ysep=7pt,
+        fill=black,
+        fill opacity=0.16,
+        draw=none,
+        text opacity=0
+      ] at ([xshift=1.15pt,yshift=-1.15pt]current page.north east) {%
+        \MITPressBadgeContent
+      };
+
+      % Main badge: gradient fill, NO boundary line.
+      \node[
+        anchor=north east,
+        xshift=\MITPressTagXShift,
+        yshift=\MITPressTagYShift,
+        rounded corners=7pt,
+        inner xsep=11pt,
+        inner ysep=7pt,
+        draw=none,
+        top color=MITTagCream,
+        bottom color=MITTagOrange!18
+      ] at (current page.north east) {%
+        \MITPressBadgeContent
+      };
+
+    \end{tikzpicture}%
+  }%
+}
+
+% Attach the badge to the real first cover page.
+\patchcmd{\nowfnt@bookauthortitlepage}
+  {\thispagestyle{\nowfnt@titlepagestyle}}
+  {\thispagestyle{\nowfnt@titlepagestyle}%
+   \ifMITPressTagFirstCover
+     \MITPressForthcomingTag
+   \fi}
+  {}
+  {\PackageWarning{MITPressTag}{Could not attach the MIT Press tag to the cover page}}
+
+% Move the existing cover text down slightly, only on the first cover page.
+\patchcmd{\nowfnt@bookauthortitlepage}
+  {\raggedleft}
+  {\raggedleft
+   \ifMITPressTagFirstCover
+     \vspace*{\CoverTitleDrop}%
+     \global\MITPressTagFirstCoverfalse
+   \fi}
+  {}
+  {\PackageWarning{MITPressTag}{Could not move the first-cover text down}}
+
+
+
+\makeatother
+
+% \makeatother
+
+% ====== Override publisher UI strings with Chinese ======
+\renewcommand{\contentsname}{目\ 次}
+\renewcommand{\listfigurename}{图\ 目录}
+\renewcommand{\listtablename}{表\ 目录}
+\renewcommand{\figurename}{图}
+\renewcommand{\tablename}{表}
+\renewcommand{\bibname}{参考文献}
+\renewcommand{\indexname}{索引}
+\renewcommand{\appendixname}{附录}
+\renewcommand{\acknowledgementsname}{致谢}
+\makeatletter\renewcommand{\nowfnt@contentsname}{目\ 次}\makeatother
+\crefname{figure}{图}{图}
+\crefname{table}{表}{表}
+\crefname{equation}{式}{式}
+\crefname{section}{节}{节}
+\crefname{chapter}{章}{章}
+\crefname{appendix}{附录}{附录}
+\crefname{part}{部分}{部分}
+
+\begin{document}
+
+\makeabstracttitle
+
+\begin{abstract}
+本书聚焦于塑造扩散模型发展的核心原理，追溯其起源，并阐明不同的数学表述如何源自共同的思想。
+
+
+扩散建模首先定义一个\emph{前向腐蚀过程}（forward corruption process），它逐步将数据变为噪声。该前向过程通过定义一族连续的中间分布，将数据分布与一个简单的噪声分布联系起来。扩散模型的核心目标是构造另一个沿相反方向进行的过程，在把噪声变换为数据的同时，恢复出由前向腐蚀过程所定义的相同中间分布。
+
+我们从三个互补的角度来形式化这一思想。\emph{变分视角}（variational view）受变分自编码器的启发，将扩散视为逐步学习去噪的过程，通过求解一系列小的去噪目标，使模型学会将噪声还原为数据。\emph{分数视角}（score-based view）植根于基于能量的建模，学习不断演化的数据分布的梯度（分数），该梯度指示了如何将样本推向概率更高的区域。\emph{流视角}（flow-based view）与归一化流相关，将生成视为沿一条平滑路径、在一个学习到的速度场下把样本从噪声移向数据的过程。
+
+
+
+这三种视角共享一个共同的主干：一个学习到的、依赖于时间的速度场，其流将一个简单的先验收送到数据。有了它，采样就归结为求解一个微分方程，该方程沿一条连续的生成轨迹将噪声演化为数据。在此基础之上，本书讨论了用于可控生成的\emph{引导}（guidance）、用于高效采样的\emph{高级数值求解器}，以及受扩散启发的\emph{流映射模型}（flow-map models）——后者学习沿该轨迹任意时刻之间的直接映射。
+
+本书面向具备深度学习基础知识的读者，他们希望对扩散模型获得清晰、概念化且数学上有根基的理解。本书阐述了该主题的核心原理，解释了统一其众多表述形式的思想，并为在这一快速发展的领域中进一步研究提供了坚实基础。因此，本书既可作为研究者的原理性参考，也适合作为学生和新入门读者的易读入门读物。本书的补充材料可在本书网站获取：
+
+{\centering
+\url{https://the-principles-of-diffusion-models.github.io/}\par
+}
+\end{abstract}
+
+
+\begin{acknowledgements}
+
+我们衷心感谢社区中许多提供宝贵反馈、帮助我们发现勘误的成员。特别感谢以下各位（按字母顺序排列）：\emph{Francis Bach}、\emph{Ilia Badanin}、\emph{Rwiddhi Chakraborty}、\emph{Mauricio Delbracio}、\emph{Jacob Lessing}、\emph{Kaiming He}、\emph{Yutong (Kelly) He}、\emph{Durk Kingma}、\emph{Shucheng Li}、\emph{Ramtin Moslemi}、\emph{Rukmangadh Sai Myana}、\emph{Stefano Peluchetti}、\emph{Yuri Plotkin}、\emph{François Rozet}、\emph{Yair Shenfeld}、\emph{Molei Tao}、\emph{Mohamad Ternanni} 和 \emph{Baojian Zhou}，以及匿名审稿人和其他热心分享反馈的读者。
+
+作者还要向首尔大学和 KIAS 的 \emph{Dohyun Kwon} 教授致以深深的谢意，感谢他慷慨投入时间与精力参与本书的工作。他仔细审阅了\Cref{ch:ot-eot}的部分内容，帮助确保了命题与证明的正确性，并在多次有价值的讨论中为阐述的清晰化做出了贡献。除了技术建议之外，他深思熟虑的反馈和乐于分享观点的态度，始终是本书撰写过程中的鼓励之源。我们由衷感谢他的支持和同行情谊，这些都丰富了本书的最终版本。
+
+
+
+
+
+
+\end{acknowledgements}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\input{Preface}
+\input{notations}
+\part{深度生成式建模导论}
+\input{Prologue-Deep-Generative-Modeling}
+\part{扩散模型的起源与基础}
+\input{Part-B-diagram}
+\input{Chapter-1-Varational-Perspective-From-VAE-to-DDPM}
+\input{Chapter-2-Score-Based-Perspective-From-EBMs-to-NCSN}
+\input{Chapter-3-Diffusion-Models-Today-Score-SDE-Framework}
+\input{Chapter-4-Flow-Based-Perspective-From-NFs-to-Flow-Matching}
+\input{Chapter-5-They-Are-All-Equivalent}
+\input{Chapter-4-plus-OT-and-Diffusion-Model}
+\part{扩散模型的采样}
+\input{Part-C-D-diagram}
+\input{Chapter-6-Guidance}
+\input{Chapter-7-Sophisticated-Solvers-for-Fast-Sampling}
+
+\part{迈向学习快速的扩散生成器}
+\input{Chapter-8-Post-Training-Methods-for-Fast-Sampling}
+\input{Chapter-9-Learning-Fast-Generator-from-Scratch}
+
+\part*{结语与展望}
+\addcontentsline{toc}{part}{结语与展望}
+\input{Chapter-10-Epilogue-and-Outlook}
+% \part{Postface}
+% \input{9_Postface and Conclusion}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+\appendix
+
+\input{A_Crash-Course-of-DE}
+\input{B_Continuity-Equation}
+\input{C_SDE-and-Ito}
+\input{D_Proofs}
+
+
+
+
+\backmatter  % references, restarts sample
+
+
+
+
+\printbibliography[title={参考文献}]
+
+\end{document}

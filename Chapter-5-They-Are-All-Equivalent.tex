@@ -1,0 +1,1333 @@
+\chapter{扩散模型的统一与系统性视角}\label{ch:all-equivalent} 
+
+\epigraph{
+    \textit{数学是给不同事物起相同名字的艺术。
+}}{Henri Poincaré}
+
+本章提出一个系统性的视角，将基于变分、基于分数和基于流的视角纳入一个连贯的图景之中。尽管这些方法的出发点（直觉）各不相同，但它们都收敛到现代扩散方法背后相同的核心机制。在 \Cref{ch:variational,ch:score-based,ch:score-sde,ch:flow-based} 的基础上，我们观察到一个共同的配方：定义一个前向腐蚀过程以追踪一条边缘分布的路径，然后学习一个随时间变化的向量场，沿着这条路径将一个简单的先验传输到数据分布。
+
+所有视角中的一个关键要素是 \Cref{sec:conditional-trick} 中介绍的条件化技巧，它将一个难以处理的边缘目标转化为一个可处理的条件目标，从而带来稳定且高效的训练。
+
+在 \Cref{sec:elucidating} 中，我们以系统的方式分析训练目标，识别其本质组件，并阐明损失函数在基于变分、基于分数和基于流的视角下是如何构造的。
+
+
+\Cref{sec:equivalent-parametrizations} 表明，任何形如 $\rvx_t = \alpha_t \rvx_0 + \sigma_t \beps$ 的前向仿射噪声注入都可以等价地转化为标准的线性调度 $\rvx_t = (1 - t)\rvx_0 + t\beps$。此外，常见的参数化方式（如噪声预测、干净数据预测、分数预测和速度预测）在梯度层面上是可以相互替换的。因此，噪声调度与参数化的选择都遵循相同的建模原则。
+
+
+
+最后，\Cref{sec:comparison-connection} 对全章讨论进行总结，并指出其统辖法则：Fokker–Planck 方程。无论被视为变分方案（离散时间去噪）、基于分数的方法（SDE 表述）还是基于流的方法（ODE 表述），每一种都构造了一个生成器，其边缘分布遵循相同的密度演化。因此，Fokker–Planck 方程是三种视角共同遵循的普适约束，差异仅体现在参数化和训练目标上。
+
+
+
+\newpage
+
+\section{条件化技巧：扩散模型的秘密武器}\label{sec:conditional-trick}
+到目前为止，我们已经从三个看似截然不同的源头探讨了扩散模型：基于变分、基于分数和基于流的视角。每一种最初都由不同的目标所驱动，并导出了各自的训练目标（在固定 $t$ 下）：
+\begin{itemize}
+    \item \textbfs{变分视角：} 学习一个参数化密度 $p_{\bm{\phi}}(\mathbf{x}_{t-\Delta t}|\mathbf{x}_t)$，通过最小化以下目标来逼近 oracle 反向转移 $p(\mathbf{x}_{t-\Delta t}|\mathbf{x}_t)$：
+    \[
+    \mathcal{J}_{\text{KL}}(\bm{\phi}) := \mathbb{E}_{p_t(\mathbf{x}_t)}\left[
+        \mathcal{D}_{\mathrm{KL}}\big(p(\mathbf{x}_{t-\Delta t}|\mathbf{x}_t) \| p_{\bm{\phi}}(\mathbf{x}_{t-\Delta t}|\mathbf{x}_t)\big)
+    \right];
+    \]
+    \item \textbfs{基于分数的视角：} 学习一个分数模型 $\rvs_{\bm{\phi}}(\rvx_t, t)$，通过以下目标来逼近边缘分数 $\nabla_{\rvx} \log p_t(\rvx_t)$：
+    \[
+    \mathcal{J}_{\text{SM}}(\bm{\phi}) := \mathbb{E}_{p_t(\rvx_t)}\left[
+       \left\| \rvs_{\bm{\phi}}(\rvx_t, t) - \nabla_{\rvx} \log p_t(\rvx_t) \right\|_2^2
+    \right];
+    \]
+    \item \textbfs{基于流的视角：} 学习一个速度模型 $\rvv_{\bm{\phi}}(\rvx_t, t)$，通过最小化以下目标来匹配 oracle 速度 $\rvv_t(\rvx_t)$（例如由 \Cref{eq:marginal-oracle-velocity} 定义）：
+    \[
+    \mathcal{J}_{\text{FM}}(\bm{\phi}) := \mathbb{E}_{p_t(\rvx_t)} \left[
+        \left\| \rvv_{\bm{\phi}}(\rvx_t, t) - \rvv_t(\rvx_t) \right\|_2^2
+    \right].
+    \]
+\end{itemize}
+
+乍看之下，这些目标似乎无从下手，因为它们都需要获取在一般情形下根本不可知的 oracle 量。但接下来出现了令人兴奋的转折：每种方法都独立地得到了解决该问题的同一种优雅方案：\emph{以数据 $\rvx_0$ 为条件}。这一技巧将每一个难以处理的训练目标都转化为可处理的目标。
+
+
+
+这种优雅的“条件化技巧”将目标改写为关于已知高斯条件分布 $p_t(\rvx_t | \rvx_0)$ 的期望，从而得到梯度等价的闭式回归目标和可处理的训练目标：
+\begin{itemize}
+    \item \textbfs{变分视角}（\Cref{eq:kl-matching}）\textbfs{：}
+    \[
+    \mathcal{J}_{\text{KL}}(\bm{\phi}) = \underbrace{\mathbb{E}_{\rvx_0} \mathbb{E}_{p_t(\rvx_t|\rvx_0)} \left[
+        \mathcal{D}_{\mathrm{KL}}\big(p(\rvx_{t-\Delta t}|\rvx_t, \rvx_0) \| p_{\bm{\phi}}(\rvx_{t-\Delta t}|\rvx_t)\big)
+    \right]}_{\mathcal{J}_{\text{CKL}}(\bm{\phi})} + C;
+    \]    
+    \item \textbfs{基于分数的视角}（\Cref{eq:score-matching}）\textbfs{：}
+    \[
+    \mathcal{J}_{\text{SM}}(\bm{\phi}) = \underbrace{\mathbb{E}_{\rvx_0} \mathbb{E}_{p_t(\rvx_t|\rvx_0)} \left[
+        \left\| \rvs_{\bm{\phi}}(\rvx_t, t) - \nabla_{\rvx_t} \log p_t(\rvx_t | \rvx_0) \right\|_2^2
+    \right]}_{\mathcal{J}_{\text{DSM}}(\bm{\phi})} + C;
+    \]
+    \item \textbfs{基于流的视角}（\Cref{eq:fm-cfm}）\textbfs{：}
+    \[
+    \mathcal{J}_{\text{FM}}(\bm{\phi}) = \underbrace{\mathbb{E}_{\rvx_0} \mathbb{E}_{p_t(\rvx_t|\rvx_0)} \left[
+        \left\| \rvv_{\bm{\phi}}(\rvx_t, t) - \rvv_t(\rvx_t | \rvx_0) \right\|^2
+    \right]}_{\mathcal{J}_{\text{CFM}}(\bm{\phi})} + C.
+    \]
+\end{itemize}
+为了建立统一的视角，接下来我们以系统的方式重新审视条件 KL、分数和速度目标。关键在于，这些目标不仅可处理，而且与它们各自的原形式仅相差一个常数垂直平移。
+条件版本（$\mathcal{J}_{\text{CKL}}$、$\mathcal{J}_{\text{DSM}}$、$\mathcal{J}_{\text{CFM}}$）与原版本（$\mathcal{J}_{\text{KL}}$、$\mathcal{J}_{\text{SM}}$、$\mathcal{J}_{\text{FM}}$）仅相差这一平移，这不改变梯度，因而保持了优化景观。
+因此，最小化解仍然与真实的 oracle 目标唯一对应，因为每一个都归结为一个最小二乘回归问题，其解恢复出对应的条件期望：
+\begin{mdframed}
+    \begin{align}\label{eq:three-minimizer-oracle}
+\begin{aligned}
+        p^*(\mathbf{x}_{t-\Delta t}|\mathbf{x}_t) &= \mathbb{E}_{\mathbf{x}_0 \sim p(\cdot|\mathbf{x}_t)} \big[p(\mathbf{x}_{t-\Delta t}|\mathbf{x}_t, \mathbf{x}_0)\big] &&= p(\mathbf{x}_{t-\Delta t}|\mathbf{x}_t), \\
+    \mathbf{s}^*(\mathbf{x}_t, t) &= \mathbb{E}_{\mathbf{x}_0 \sim p(\cdot|\mathbf{x}_t)} \big[\nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t|\mathbf{x}_0)\big] &&= \nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t), \\
+    \mathbf{v}^*(\mathbf{x}_t, t) &= \mathbb{E}_{\mathbf{x}_0 \sim p(\cdot|\mathbf{x}_t)} \big[\mathbf{v}_t(\mathbf{x}_t|\mathbf{x}_0)\big] &&= \mathbf{v}_t(\mathbf{x}_t).
+\end{aligned}
+\end{align}
+\end{mdframed}
+
+
+\exm{有限数据集上的闭式 oracle 目标}{
+为了使 \Cref{eq:three-minimizer-oracle} 更具体，假设数据分布是经验测度
+\[
+\hat p_0=\frac{1}{N}\sum_{i=1}^N \delta_{\rvx_0^{(i)}},
+\]
+其中 $\{\rvx_0^{(i)}\}_{i=1}^N$ 表示有限的训练集。
+
+在 \Cref{eq:three-minimizer-oracle} 中，记号
+\[
+\rvx_0 \sim p(\cdot|\rvx_t)
+\]
+表示我们在给定带噪观测 $\rvx_t$ 的条件下，对干净样本的后验分布求平均。等价地，对任意量 $\rvh(\rvx_0)$，
+\[
+\mathbb{E}_{\rvx_0 \sim p(\cdot|\rvx_t)}[\rvh(\rvx_0)]
+=
+\int \rvh(\rvx_0)\, p(\rvx_0|\rvx_t)\diff\rvx_0.
+\]
+
+由贝叶斯法则，
+\[
+p(\rvx_0|\rvx_t)
+=
+\frac{p_t(\rvx_t|\rvx_0)\,p_{\text{data}}(\rvx_0)}
+{\int p_t(\rvx_t|\tilde{\rvx}_0)\,p_{\text{data}}(\tilde{\rvx}_0)\diff\tilde{\rvx}_0}.
+\]
+在标准高斯扩散前向过程下，
+\[
+p_t(\rvx_t|\rvx_0^{(i)})
+=
+\mathcal{N}\left(\rvx_t;\alpha_t \rvx_0^{(i)}, \sigma_t^2 \rmI\right),
+\]
+因此条件似然是显式的。然而在总体层面，后验 \(p(\rvx_0|\rvx_t)\) 仍需对完整的数据分布 \(p_{\text{data}}\) 求平均。
+
+如果现在将 \(p_{\text{data}}\) 替换为经验测度
+\[
+\hat p_0=\frac{1}{N}\sum_{i=1}^N \delta_{\rvx_0^{(i)}},
+\]
+那么后验 \(p(\rvx_0|\rvx_t)\) 仅在训练样本上有支撑，且其在 \(\rvx_0^{(i)}\) 处的质量为
+\[
+p(\rvx_0=\rvx_0^{(i)}|\rvx_t)
+=
+\frac{p_t(\rvx_t|\rvx_0^{(i)})}
+{\sum_{j=1}^N p_t(\rvx_t|\rvx_0^{(j)})}
+=: w_i(\rvx_t,t),
+\qquad
+\sum_{i=1}^N w_i(\rvx_t,t)=1.
+\]
+因此上面的后验期望归结为有限和
+\[
+\mathbb{E}_{\rvx_0 \sim p(\cdot|\rvx_t)}[\rvh(\rvx_0)]
+=
+\sum_{i=1}^N w_i(\rvx_t,t)\rvh(\rvx_0^{(i)}).
+\]
+于是，在有限数据集的情形下，\Cref{eq:three-minimizer-oracle} 中抽象的后验平均变成了对训练集的具体加权平均，权重为 \(w_i(\rvx_t,t)\)。我们现在将这三种情形显式地写出。
+
+\paragraph{变分视角。}
+oracle 反向转移变为
+\[
+p^*(\rvx_{t-\Delta t}|\rvx_t)
+=
+\sum_{i=1}^N
+w_i(\rvx_t,t) 
+p(\rvx_{t-\Delta t}|\rvx_t,\rvx_0^{(i)}).
+\]
+这里每个条件反向核
+\[
+p(\rvx_{t-\Delta t}|\rvx_t,\rvx_0^{(i)})
+\]
+在高斯扩散下本身就有闭式表达；事实上，如引理~\ref{ddpm-reverse-kernel} 所示，它是高斯的。因此真实的反向核只是显式高斯桥的后验加权混合。
+
+\paragraph{基于分数的视角。}
+类似地，oracle 分数变为
+\[
+\mathbf{s}^*(\rvx_t,t)
+=
+\sum_{i=1}^N
+w_i(\rvx_t,t) 
+\nabla_{\rvx_t}\log p_t(\rvx_t|\rvx_0^{(i)}).
+\]
+条件分数是显式的：
+\[
+\nabla_{\rvx_t}\log p_t(\rvx_t|\rvx_0^{(i)})
+=
+-\frac{\rvx_t-\alpha_t\rvx_0^{(i)}}{\sigma_t^2}.
+\]
+因此，
+\[
+\mathbf{s}^*(\rvx_t,t)
+=
+-\frac{1}{\sigma_t^2}
+\left(
+\rvx_t-\alpha_t\sum_{i=1}^N w_i(\rvx_t,t) \rvx_0^{(i)}
+\right).
+\]
+所以边缘分数从带噪样本指向训练样本的后验加权平均。
+
+\paragraph{基于流的视角。}
+同样的现象也出现在流匹配中：
+\[
+\mathbf{v}^*(\rvx_t,t)
+=
+\sum_{i=1}^N
+w_i(\rvx_t,t) 
+\mathbf{v}_t(\rvx_t|\rvx_0^{(i)}).
+\]
+同样，这些构建模块是显式的。相应的条件速度场具有闭式形式：
+\[
+\mathbf{v}_t(\rvx_t|\rvx_0^{(i)})
+=
+{\alpha}'_t \rvx_0^{(i)}
++
+\frac{{\sigma}'_t}{\sigma_t}\bigl(\rvx_t-\alpha_t\rvx_0^{(i)}\bigr).
+\]
+因此 oracle 速度也是数据集上显式的后验加权平均。
+
+综合起来，这些公式表明：在有限数据集上，所有三个 oracle 目标都归结为闭式条件量的显式后验加权平均。
+}
+
+这种共同的条件化重构并非巧合：它通过使训练变得可处理，揭示了一种深刻的统一性。变分扩散、基于分数的 SDE 和流匹配只是同一原理的不同侧面。三种视角，一个洞见，优雅地联系在一起。我们将在本章余下部分继续探讨它们的等价性。
+
+\newpage
+\clearpage
+
+\section{阐释扩散模型训练损失的路线图
+}\label{sec:elucidating}
+
+本节构建一个关于扩散模型训练损失的系统视角。
+在 \Cref{subsec:four-predictions} 中，我们将标准的三个目标扩展为更广泛的四种参数化集合，说明它们如何从不同的建模视角中产生。
+在 \Cref{subsec:summary-disentagle} 中，我们将这些结果提炼为一个解耦扩散目标结构的通用框架，为 \Cref{sec:equivalent-parametrizations} 中的等价性结论奠定基础。
+
+
+
+
+\subsection{扩散模型中的四种常见参数化}\label{subsec:four-predictions}
+除非另有说明，本节中我们考虑前向扰动核
+\[
+p_t(\mathbf{x}_t|\mathbf{x}_0) = \mathcal{N}\left(\mathbf{x}_t; \alpha_t \mathbf{x}_0, \sigma_t^2 \mathbf{I} \right),
+\]
+其中 $\mathbf{x}_0 \sim p_{\mathrm{data}}$，如 \Cref{eq:forward_kernel} 所定义。
+
+
+
+设 $\omega: [0, T] \to \mathbb{R}_{>0}$ 表示一个正的时间加权函数。
+四种标准参数化（噪声 $\bm{\epsilon}_{\bm{\phi}}$、干净数据 $\rvx_{\bm{\phi}}$、分数 $\rvs_{\bm{\phi}}$ 和速度 $\rvv_{\bm{\phi}}$），连同它们各自的最小化解 $\bm{\epsilon}^*$、$\rvx^*$、$\rvs^*$ 和 $\rvv^*$，为清晰起见并便于后续讨论，总结如下。
+
+\paragraph{变分视角。} 基于 DDPM 中的 KL 散度（见 \Cref{subsec:ddpm-prediction,subsec:connection-vdm}），这一方法归结为预测产生 $\mathbf{x}_t$ 的期望噪声，或预测 $\mathbf{x}_t$ 所由扰动的期望干净信号。
+\begin{enumerate}
+    \item \textbfs{$\beps$-预测（噪声预测）} \citep{ho2020denoising}：
+    \begin{equation}\label{eq:noise-def}
+        \bm{\epsilon}_{\bm{\phi}}(\mathbf{x}_t,t) \approx \mathbb{E}[\bm{\epsilon}|\mathbf{x}_t]=\bm{\epsilon}^*(\rvx_t, t)
+    \end{equation}
+    其训练目标为
+    \[
+        \mathcal{L}_{\text{noise}}(\bm{\phi}) := \mathbb{E}_t \left[\omega(t) \mathbb{E}_{\mathbf{x}_0, \bm{\epsilon}} \left\| \bm{\epsilon}_{\bm{\phi}}(\mathbf{x}_t,t) - \bm{\epsilon} \right\|_2^2 \right].
+    \]
+    这里 $\beps^*$ 表示为获得给定 $\rvx_t$ 而注入的平均噪声。
+
+    \item \textbfs{$\rvx$-预测（干净数据预测）} \citep{kingma2021variational,karras2022elucidating,song2023consistency}：
+    \begin{equation}\label{eq:clean-def}
+        \mathbf{x}_{\bm{\phi}}(\mathbf{x}_t,t) \approx \mathbb{E}[\mathbf{x}_0|\mathbf{x}_t]=\rvx^*(\rvx_t, t)
+    \end{equation}
+    其训练目标为
+    \[
+        \mathcal{L}_{\text{clean}}(\bm{\phi}) := \mathbb{E}_t \left[\omega(t) \mathbb{E}_{\mathbf{x}_0, \bm{\epsilon}} \left\| \mathbf{x}_{\bm{\phi}}(\mathbf{x}_t,t) - \mathbf{x}_0 \right\|_2^2 \right].
+    \]
+    这里 $\rvx^*$ 表示给定带噪观测 $\rvx_t$ 时所有合理干净猜测的平均。
+\end{enumerate}
+
+\paragraph{基于分数的视角。} 预测噪声水平 $t$ 处的分数函数，它指向将 $\mathbf{x}_t$ 去噪回所有可能产生它的干净样本的平均方向：
+\begin{enumerate}
+    \item[3.]  \textbfs{分数预测} \citep{song2019generative,song2020score}：
+    \begin{equation}\label{eq:score-def}
+        \mathbf{s}_{\bm{\phi}}(\mathbf{x}_t,t) \approx \nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t) = \mathbb{E}\left[\nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t|\mathbf{x}_0) |\mathbf{x}_t\right] = \rvs^*(\rvx_t, t)
+    \end{equation}
+    其训练目标为
+    \[
+        \mathcal{L}_{\text{score}}(\bm{\phi}) := \mathbb{E}_t \left[\omega(t) \mathbb{E}_{\mathbf{x}_0, \bm{\epsilon}} \left\| \mathbf{s}_{\bm{\phi}}(\mathbf{x}_t,t) - \nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t|\mathbf{x}_0) \right\|_2^2 \right],
+    \]
+    其中条件分数满足 $\nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t|\mathbf{x}_0) = -\frac{1}{\sigma_t} \bm{\epsilon}$。
+\end{enumerate}
+
+
+\paragraph{基于流的视角。} 预测数据随着 $\mathbf{x}_t$ 演化时的瞬时平均速度：
+\begin{enumerate}
+    \item[4.] \textbfs{$\rvv$-预测（速度预测）} \citep{lipman2022flow,liu2022rectified,salimans2021progressive,albergo2023stochastic}：
+    \begin{equation}\label{eq:velocity-def}
+        \mathbf{v}_{\bm{\phi}}(\mathbf{x}_t, t) \approx \mathbb{E}\left[\left. \frac{\diff  \mathbf{x}_t}{\diff  t} \right| {\mathbf{x}_t}\right] =\rvv^*(\rvx_t, t)
+    \end{equation}
+    其训练目标为
+    \[
+        \mathcal{L}_{\text{velocity}}(\bm{\phi}) := \mathbb{E}_t \left[\omega(t) \mathbb{E}_{\mathbf{x}_0, \bm{\epsilon}} \left\| \mathbf{v}_{\bm{\phi}}(\mathbf{x}_t,t) - \rvv_t(\rvx_t | \rvx_0,\bm{\epsilon}) \right\|_2^2 \right],
+    \]
+    其中条件速度为 $\rvv_t(\rvx_t|\rvx_0,\bm{\epsilon}) = \alpha_t' \mathbf{x}_0 + \sigma_t' \bm{\epsilon}$。
+
+    这里 $\rvv^*$ 表示穿过观测点 $\rvx_t$ 的平均速度向量。
+\end{enumerate}
+
+
+基于 \Cref{eq:three-minimizer-oracle} 的洞见，所有四种预测类型最终都旨在近似形如“给定观测 $\mathbf{x}_t$ 时的平均噪声、干净数据、分数或速度”的条件期望。
+
+
+
+
+
+
+
+
+
+\subsection{解耦扩散模型的训练目标}\label{subsec:summary-disentagle}
+如 \Cref{subsec:four-predictions} 所示，四种预测类型的目标函数通常共享以下模板形式，用于扩散模型训练：
+% \begin{align}    \label{eq:general-dm-loss-D}
+% \begin{aligned}
+%    &\mathcal{L}(\bm{\phi}):=\\ &\mathbb{E}_{\rvx_0, \bm{\epsilon}}\int_{0}^{T} \underbrace{\eqnmarkbox[OliveGreen]{wgt}{\omega(t)} \eqnmarkbox[NavyBlue]{tsample}{p_{\text{time}}(t)}}_{\text{time weighting}}\underbrace{\norm{ \eqnmarkbox[Plum]{target}{\mathrm{NN}_{\bm{\phi}}}(\eqnmarkbox[Pink]{para}{\rvx_t}, t) - \eqnmarkbox[Plum]{target}{(A_t \rvx_0 + B_t \bm{\epsilon}) }}_2^2}_{\text{squared $\ell_2$ part}}\diff t.
+% \end{aligned}
+% \end{align}
+
+\begin{align}    \label{eq:general-dm-loss-D}
+\begin{aligned}
+   \mathcal{L}(\bm{\phi}):=\mathbb{E}_{\rvx_0, \bm{\epsilon}} \underbrace{\eqnmarkbox[NavyBlue]{tsample}{\mathbb{E}_{p_{\text{time}}(t)}}}_{\substack{\text{time} \\ \vspace{0.5cm} \text{distribution}}}\Big[ \underbrace{\eqnmarkbox[OliveGreen]{wgt}{\omega(t)}}_{\substack{\text{time} \\ \vspace{0.5cm}\text{weighting}}}\underbrace{\norm{ \eqnmarkbox[Plum]{target}{\mathrm{NN}_{\bm{\phi}}}(\eqnmarkbox[Pink]{para}{\rvx_t}, t) - \eqnmarkbox[Plum]{target}{(A_t \rvx_0 + B_t \bm{\epsilon}) }}_2^2}_{\text{MSE part}}\Big].
+\end{aligned}
+\end{align}
+
+
+
+这里，为了提升训练效率并优化扩散模型的学习流程，几个关键的设计选择至关重要~\citep{karras2022elucidating,lu2024simplifying}：
+\begin{enumerate}
+    \item[(A)] 通过 $\alpha_t$ 和 $\sigma_t$ 决定前向过程中 $\eqnmarkbox[Pink]{para}{\rvx_t}$ 的噪声调度；
+    \item[(B)] $\eqnmarkbox[Plum]{target}{\mathrm{NN}_{\bm{\phi}}}$ 的预测类型及其对应的回归目标 $\eqnmarkbox[Plum]{target}{(A_t \rvx_0 + B_t \bm{\epsilon}) }$；
+    \item[(C)] 时间加权函数 $\eqnmarkbox[OliveGreen]{wgt}{\omega(\cdot)} \colon [0,T] \to \mathbb{R}_{\geq 0}$；
+    \item[(D)] 时间分布 $\eqnmarkbox[NavyBlue]{tsample}{p_{\text{time}}}$。
+\end{enumerate}
+
+我们在此详细阐述这四个组件，以此作为后续各节讨论的路线图。
+
+\paragraph{(A) 噪声调度 $\alpha_t$ 与 $\sigma_t$。}
+用户可以灵活选择适合其应用的调度，常见示例总结于 \Cref{tb:interpolant_instances}。重要的是，正如我们将在 \Cref{eq:fm-general-affine-formula,eq:any-to-trig} 中证明的，所有形如 $\mathbf{x}_t = \alpha_t \mathbf{x}_0 + \sigma_t \bm{\epsilon}$ 的仿射流在数学上都是等价的。具体而言，任何此类插值都可以通过适当的时间重参数化和空间缩放，转化为规范的线性调度（$\alpha_t = 1 - t$，$\sigma_t = t$）或三角调度（$\alpha_t = \cos t$，$\sigma_t = \sin t$）。
+
+
+\paragraph{(B) 参数化 $\mathrm{NN}_{\bm{\phi}}$ 与训练目标 $A_t \rvx_0 + B_t \bm{\epsilon}$。}  用户可以灵活选择模型的预测目标：干净信号、噪声、分数或速度预测。如 \Cref{subsec:four-predictions} 所详述，所有这些预测类型都共享如下形式的共同回归目标
+\[
+    \text{Regression Target} = A_t \mathbf{x}_0 + B_t \bm{\epsilon},
+\]
+其中系数 $A_t$ 和 $B_t$ 既取决于所选的预测类型，也取决于调度 $(\alpha_t, \sigma_t)$。这些关系总结于 \Cref{tb:A_t-B_t-parametrizations}。
+
+尽管这四种参数化看起来不同，我们将在 \Cref{eq:predictions-equivalence} 中证明，它们可以通过简单的代数操作相互转化。此外，我们还将在 \Cref{eq:s-e-x-v-equi} 中证明，\Cref{eq:general-dm-loss-D} 中的 $\ell_2$ 平方损失项在所有预测类型之间保持梯度等价，仅相差一个（$\omega(t) p_{\mathrm{time}}(t)$ 之外的）时间加权因子，该因子仅由噪声调度 $(\alpha_t, \sigma_t)$ 决定。
+
+
+
+\begin{table}[th]
+  \caption{不同参数化之间关系的总结。
+四种参数化在数学上相互等价，可以通过简单的代数变换相互转换。
+}
+  \small
+  \centering
+  \resizebox{0.48\textwidth}{!}{
+  \begin{tabular}{ccc}
+     \toprule
+      回归目标 =    &  \multicolumn{2}{c}{$A_t\rvx_0 + B_t \bm{\epsilon}$} \\
+              &   $A_t$   & $B_t$ \\
+       \midrule
+    干净数据 & $1 $   & $0$ \\
+      噪声 & $0$   &  $1$\\
+    条件分数 & $0 $   &  -$\frac{1}{\sigma_t}$ \\
+     条件速度 & $\alpha_t' $   &  $\sigma_t'$ \\
+ \bottomrule
+  \end{tabular}
+  }
+  \label{tb:A_t-B_t-parametrizations}
+\end{table}
+
+
+
+\paragraph{(C) 时间分布 $p_{\text{time}}(t)$。} 由于训练损失是关于 $t$ 的期望，从 $p_{\mathrm{time}}(t)$ 中采样时间在数学上等价于用 $p_{\mathrm{time}}(t)$ 对每个 $t$ 的 MSE 进行加权；这一因子可以被吸收到现有的时间加权 $\omega(t)$ 之中\footnote{我们关于时间的总体目标是一个如下形式的积分
+\[
+\mathcal{L} = \int_{0}^{T} \omega(t)\mathtt{mse}(t)\diff t,
+\]
+其中 $\mathtt{mse}(t)$ 表示每个 $t$ 的类 MSE 项。
+如果训练时从 $t\sim p_{\mathrm{time}}(t)$ 中采样，则 $\mathcal{L}$ 的一个无偏 Monte Carlo 估计量为
+\[
+\widehat{\mathcal{L}} = \mathbb{E}_{t\sim p_{\mathrm{time}}} \left[ \tfrac{\omega(t)}{p_{\mathrm{time}}(t)} \mathtt{mse}(t) \right],
+\]
+即采样与加权可通过重要性加权互换。}。然而，经验证据\footnote{然而在实践中，我们是在一个离散的时间点集合上用小批量 SGD 来近似训练目标的。在这种近似下，$p_{\mathrm{time}}(t)$ 的不同选择会同时改变梯度的方差以及施加于每个时间步的有效权重。因此我们分别讨论 $p_{\mathrm{time}}(t)$（采样）和 $\omega(t)$（加权）。}表明，$p_{\mathrm{time}}(t)$ 的不同选择会影响性能。因此，我们分别讨论时间分布 $p_{\mathrm{time}}(t)$ 和时间加权函数 $\omega(t)$。
+
+时间分布的一个常见选择是 $[0,T]$ 上的均匀分布~\citep{ho2020denoising,song2020score,lipman2022flow,liu2022rectified}。其他选项包括对数正态分布~\citep{karras2022elucidating}以及自适应重要性采样方法~\citep{song2021maximum,kingma2021variational}。
+
+
+
+\paragraph{(D) 时间加权函数 $\omega(t)$。} 加权函数的一个常见选择是常数加权 $\omega \equiv 1$~\citep{ho2020denoising,karras2022elucidating,lipman2022flow,liu2022rectified}，尽管也有自适应加权方案被提出~\citep{karras2023analyzing}。$\omega(t)$ 的某些选择能将 \Cref{eq:general-dm-loss-D} 转化为负对数似然的更紧上界，从而有效地将目标重新表述为最大似然训练。$\omega(t)$ 的著名加权方案包括令 $\omega(t) = g^2(t)$~\citep{song2021maximum}，其中 $g$ 是 \Cref{eq:sde_forward} 中前向 SDE 的扩散系数。其他方法使用信噪比（SNR）加权~\citep{kingma2021variational}或单调加权函数~\citep{kingma2023understanding}，其中 $\omega(t)$ 是时间的一个单调函数。
+
+在这些选择中，单调加权尤其有趣：它不仅仅是对训练损失的一种重加权，还具有清晰的变分解释。特别地，\citet{kim2022soft,kingma2023understanding} 证明，在单调性条件下，扩散目标等价于（相差一个可加常数）高斯增强数据上的平均 ELBO。
+
+\subparagraph{单调加权与带数据增强的 ELBO 视角。}
+我们现在解释这一解释。在加权满足单调性条件下，扩散目标等价于（相差一个可加常数）\emph{高斯噪声增强数据}上的平均 ELBO。将目标改写为共同的加权损失形式后，这一解释取决于噪声水平上诱导出的加权，而非具体的参数化。因此，下文我们使用 $\beps$-参数化纯粹作为一种方便的记号。
+
+出发点是上文建立的加权损失形式。设
+$\lambda_t := \log(\alpha_t^2/\sigma_t^2)$ 表示对数信噪比。通过从 $t$ 到 $\lambda$ 的变量替换，扩散目标可以写成
+\[
+\mathcal{L}_\omega(\rvx_0)
+= \frac{1}{2}
+\int_{\lambda_{\min}}^{\lambda_{\max}}
+\omega(\lambda) 
+\E_{\beps}\!\left[
+\|\beps_{\bm{\phi}}(\rvx_\lambda,\lambda)-\beps\|_2^2
+\right]
+\diff\lambda,
+\]
+其中 $\omega(\lambda)$ 是有效加权函数。在总体目标层面，损失仅依赖于 $\omega(\lambda)$ 和两个端点，而不依赖于它们之间的噪声调度。
+
+关键一步是将每个水平的去噪误差与一个全局变分量联系起来。回顾变分视角下 DDPM 的 ELBO 表述（\Cref{eq:ddpm-elbo,eq:ddpm-diffusion}），完整的负 ELBO 包含一组在所有噪声水平上比较前向过程与反向过程的 KL 项。我们现在将这一比较限制在扩散路径从噪声水平 $t$ 到终端时刻 $T$ 的剩余部分，并且不失一般性地取 $T=1$。对每个 $t \in [0,1]$，定义
+\begin{equation}\label{eq:partial-chain-kl}
+L(t;\rvx_0)
+:=
+\mathcal{D}_{\mathrm{KL}}\!\big(
+  p(\rvx_{t:1} |\rvx_0)
+  \;\|\;
+  p_{\bm{\phi}}(\rvx_{t:1})
+\big),
+\end{equation}
+其中 $\rvx_{t:1} := \{\rvx_s\}_{s \in [t,1]}$ 表示从水平 $t$ 到终端水平的连续时间随机路径，$p(\rvx_{t:1} |\rvx_0)$ 是给定 $\rvx_0$ 时该部分上前向过程的路径测度，而 $p_{\bm{\phi}}(\rvx_{t:1})$ 是所学反向模型对应的路径测度。这是将 $\mathcal{L}_{\mathrm{diffusion}}$（\Cref{eq:ddpm-diffusion}）中的求和限制到步骤 $i \geq t$ 的连续时间类比。在 $t = 0$ 时，$L(0;\rvx_0)$ 相差一个可加常数恢复出完整的负 ELBO；在 $t = 1$ 时，只剩下终端的不匹配。
+
+直观上，$L(t;\rvx_0)$ 度量的是生成模型在必须从腐蚀水平 $t$ 开始反转前向过程时所付出的变分代价：对于大的 $t$，大部分腐蚀已经发生，剩余代价很小；对于小的 $t$，模型必须顾及几乎完整的反向过程，因此代价很大。
+
+可以证明，这一代价随 $t$ 变化的速率恰好是每个水平的去噪误差：
+\[
+\frac{\diff}{\diff t}L(t;\rvx_0)
+=
+\frac{1}{2}\frac{\diff\lambda_t}{\diff t} 
+\E_{\beps}\!\left[
+\|\beps_{\bm{\phi}}(\rvx_t,t)-\beps\|_2^2
+\right].
+\]
+这一恒等式揭示了每个噪声水平处的去噪损失并非一个孤立的回归目标，而是 \Cref{eq:partial-chain-kl} 中全局变分代价的瞬时变化率。代入加权损失并应用分部积分，可将导数从 $L$ 转移到加权函数上：
+\[
+\mathcal{L}_\omega(\rvx_0)
+=
+\int_0^1
+\frac{\diff}{\diff t} \omega(\lambda_t)\;
+L(t;\rvx_0) \diff t
++ \text{常数}.
+\]
+如果 $\omega(\lambda_t)$ 关于 $t$ 单调递增（等价地，关于 $\lambda$ 单调递减），则
+$\frac{\diff}{\diff t} \omega(\lambda_t)\ge 0$，并且可以被归一化为噪声水平上的一个概率分布 $p_\omega(t)$。目标变为
+\[
+\mathcal{L}_\omega(\rvx_0)
+=
+\E_{t\sim p_\omega}\!\big[L(t;\rvx_0)\big]+ \text{常数}.
+\]
+由于 $L(t;\rvx_0)$ 相差一个可加常数就是与高斯扰动样本 $\rvx_t$ 相关的负 ELBO，单调加权具有一种简单的数据增强解释：扩散目标等价于在噪声增强数据上最大化平均 ELBO，其中增强强度按 $p_\omega$ 分布。因此，加权函数不仅仅是损失中的一个抽象系数；它决定了训练如何在不同腐蚀水平之间分配。这使目标更具可解释性，也有助于阐明为何加权的选择会同时影响优化和模型在学习中所关注的结构。
+
+
+\paragraph{结论。}
+就我们的目的而言，主要的经验是：扩散训练中许多表面上看起来是设计选择的东西，都可以通过它们如何重塑目标中噪声水平上的有效加权来理解。这一加权反过来既影响实践中的优化景观，又在特殊情形（如单调加权）下影响损失的变分解释。
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\clearpage
+\newpage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+
+\section{扩散模型中的等价性}\label{sec:equivalent-parametrizations}
+
+\Cref{subsec:four-predictions} 中引入的四种预测类型稍后将证明（\Cref{subsec:four-equiv-para}）在梯度最小化下是等价的。
+随后我们在 \Cref{subsec:all-flows-are-equiv} 中拓宽这一视角，说明不同的前向噪声调度可通过简单的时间和空间缩放相互联系。
+
+
+
+
+
+\subsection{四种预测类型相互等价}\label{subsec:four-equiv-para}
+我们首先分析 \Cref{eq:general-dm-loss-D} 中组件 (B) 的设计选择。
+
+我们已经看到，四种预测类型并非独立的选择，而是同一个底层量的不同视角。
+例如，噪声预测与干净数据预测直接相关（\Cref{subsec:ddpm-prediction}），分数预测与噪声预测也是如此（\Cref{sec:SMLD}）。
+这种反复出现的模式指向一个更深的原理：所有四种参数化在代数上等价，可以通过简单的变换相互转化。
+为使这一联系精确化，我们陈述如下命题，如 \Cref{fig:equiv-parametrizations} 所示，参见~\citep{kingma2021variational}。
+\proppp{参数化的等价性}{equi-para}{
+设最小化各自目标的最优预测为
+\[
+\bm{\epsilon}^*(\rvx_t,t) , \quad \rvx^*(\rvx_t,t), \quad \rvs^*(\rvx_t,t) , \quad \rvv^*(\rvx_t,t),
+\]
+分别对应噪声、干净数据、分数和速度参数化。它们满足如下等价关系：
+\begin{equation}\label{eq:predictions-equivalence}
+\begin{aligned}
+\bm{\epsilon}^*(\rvx_t,t) &= -\sigma_t \rvs^*(\rvx_t,t), \\
+\rvx^*(\rvx_t,t) &= \frac{1}{\alpha_t} \rvx_t
++ \frac{\sigma_t^2}{\alpha_t} \rvs^*(\rvx_t,t), \\
+\rvv^*(\rvx_t,t) &= \alpha_t' \rvx^* + \sigma_t' \bm{\epsilon}^* 
+= f(t)\rvx_t - \frac{1}{2} g^2(t)\rvs^*(\rvx_t,t).
+\end{aligned}
+\end{equation}
+这里，$f(t)$ 和 $g(t)$ 通过引理~\ref{forward-sde} 与 $\alpha_t$ 和 $\sigma_t$ 相联系。
+此外，这些最小化解满足 \Cref{eq:noise-def,eq:clean-def,eq:score-def,eq:velocity-def} 中给出的恒等式。
+}{证明类似于定理~\ref{dsm-minimizer}，后者分析了 DSM 目标下各种匹配损失的全局最优解。详见 \Cref{app-sec:equiv-para}。
+}
+
+
+\begin{figure}[th]
+    \centering
+\begin{tikzpicture}[
+    node distance=2cm and 3cm,
+    box/.style={rectangle,draw,fill=gray!10,minimum width=2.5cm,minimum height=1cm,align=center},
+    arr/.style={-{Latex[length=3mm,width=2mm]},thick,font=\footnotesize},
+    lbl/.style={draw,rounded corners,fill=white,fill opacity=1,inner sep=2pt}
+  ]
+  % 1) Nodes
+  \node[box]            (Score)    {\textbfs{分数}};
+  \node[box,right=of Score]   (Noise)    {\textbfs{噪声}};
+  \node[box,below=of Noise]   (Velocity) {\textbfs{速度}};
+  \node[box,below=of Score]   (Clean)    {\textbfs{干净数据}};
+
+  % 2) Arrows on background layer
+  \begin{pgfonlayer}{background}
+    \draw[arr] (Score)    -- (Noise);
+    \draw[arr] (Score)    -- (Clean);
+    \draw[arr] (Score)    -- (Velocity);
+    \draw[arr] (Noise)    -- (Velocity);
+    \draw[arr] (Noise)    -- (Score);
+    \draw[arr] (Clean)    -- (Score);
+    \draw[arr] (Clean)    -- (Velocity);
+    \draw[arr] (Velocity) -- (Clean);
+    \draw[arr] (Velocity) -- (Score);
+    \draw[arr] (Velocity) -- (Noise);
+  \end{pgfonlayer}
+
+  % 3) Labels (on main layer, thus on top of arrows)
+  \node[lbl] at ($(Score)!0.5!(Noise)+(0,0.5)$)
+    (eqlabel) {$\displaystyle \bm{\epsilon}^* = -\sigma_t\rvs^*$};
+  \node[lbl] at ($(Score)!0.5!(Clean)+(-1.2,0)$)
+    (xlabel) {$\displaystyle \rvx^* =\tfrac1{\alpha_t}\rvx_t + \tfrac{\sigma_t^2}{\alpha_t}\rvs^*$};
+  \node[lbl] at ($(Velocity)!0.5!(Score)-(0,0.0)$)
+    (vlabel) {$\displaystyle \rvv^* = f(t)\rvx_t - \tfrac12 g^2(t)\rvs^*$};
+  \node[lbl] at ($(Clean)!0.5!(Noise)+(4.2,0)$)
+    (vvlabel) {$\displaystyle  \rvv^*=\alpha_t'\rvx^*+\sigma_t'\bm{\epsilon}^*(\bm{\star})$};
+  \node[lbl] at ($(Clean)!0.5!(Velocity)+(0,-0.4)$)
+    (vvlabel) {$\displaystyle (\bm{\star})$};
+
+
+\end{tikzpicture}
+    \caption{\textbfs{四种参数化之间的等价关系。} $\rvv$-预测由 $\rvv^* = \alpha_t' \rvx^* + \sigma_t' \bm{\epsilon}^*$ 给出，
+其中干净数据预测与 $\beps$-预测可通过
+$\rvx_t = \alpha_t \rvx^* + \sigma_t \bm{\epsilon}^*$ 相互转换。
+\figcredit{由作者绘制。}}
+    \label{fig:equiv-parametrizations}
+\end{figure}
+
+\Cref{eq:predictions-equivalence} 在四种参数化之间（在每个 $t$ 处，给定前向加噪系数时）诱导出一种一一对应的转换
+\[
+\bm{\epsilon}_{\bm{\phi}}(\rvx_t,t), \quad \rvx_{\bm{\phi}}(\rvx_t,t), \quad \rvs_{\bm{\phi}}(\rvx_t,t), \quad   \rvv_{\bm{\phi}}(\rvx_t,t).
+\]
+在实践中，我们用某一种参数化（例如 $\bm\epsilon_{\bm\phi}$）训练单个网络。其他量则由 \Cref{eq:predictions-equivalence} 中的转换\emph{事后定义}。
+
+
+\subsection{不同参数化下的 PF-ODE}\label{subsec:pf-ode-different-para} 
+PF-ODE 容许若干种等价的参数化（分数、噪声、去噪、速度）。
+尽管原则上可以互换，但这一选择具有实际后果：它改变了向量场的刚性、离散化误差的行为以及优化的难易程度。
+对于使用高级 ODE 求解器的快速采样（见 \Cref{ch:solvers}），实践者通常采用 $\beps$ 或 $\rvx$ 预测，因为它们与求解器输入契合良好并能减少误差累积。
+对于仅使用少数几次函数求值进行训练的生成器（见 \Cref{ch:fast-scratch}），$\rvx$ 或 $\rvv$ 预测通常能产生更平滑的目标以及更好的逐步一致性。
+
+
+我们写出每种参数化下的 PF-ODE，并利用 \Cref{eq:predictions-equivalence} 显式地进行转换。结果汇总于如下命题。
+
+\proppnp{不同参数化下的 PF-ODE}{pf-ode-para}{
+设 $\alpha_t$ 和 $\sigma_t$ 为前向扰动调度，并记时间导数为
+$\alpha_t' := \tfrac{\diff \alpha_t}{\diff t}$ 和 $\sigma_t' := \tfrac{\diff \sigma_t}{\diff t}$。
+则经验 PF-ODE 容许如下等价形式
+\begin{align}\label{eq:clean_pf_ode}
+\begin{aligned}
+    \frac{\diff \rvx(t)}{\diff t}
+    &= \frac{\alpha_t'}{\alpha_t} \rvx(t)
+ - \sigma_t \left(\frac{\alpha_t'}{\alpha_t}-\frac{\sigma_t'}{\sigma_t}\right)
+   \bm{\epsilon}^*(\rvx(t), t) \\    
+    &= \frac{\sigma_t'}{\sigma_t} \rvx(t)
+ + \alpha_t \left(\frac{\alpha_t'}{\alpha_t}-\frac{\sigma_t'}{\sigma_t}\right)
+   \rvx^*(\rvx(t), t) \\
+    &= \frac{\alpha_t'}{\alpha_t} \rvx(t)
+ + \sigma_t^{2} \left(\frac{\alpha_t'}{\alpha_t}-\frac{\sigma_t'}{\sigma_t}\right)
+   \rvs^*(\rvx(t), t) \\ 
+   &= \alpha_t'\rvx^*(\rvx(t), t) + \sigma_t' \beps^*(\rvx(t), t)\\
+    &= \rvv^*(\rvx(t), t).
+\end{aligned}
+\end{align}
+}
+为了看清 Score SDE 的记号，我们回顾引理~\ref{forward-sde}。如果令
+\[
+f(t) = \frac{\alpha_t'}{\alpha_t}, 
+\quad
+g^2(t) = \frac{\diff}{\diff t} \big(\sigma_t^2\big) 
+         - 2 \frac{\alpha_t'}{\alpha_t} \sigma_t^2
+       = 2\sigma_t\sigma_t' - 2 \frac{\alpha_t'}{\alpha_t} \sigma_t^2,
+\]
+那么 PF-ODE 可以写成熟悉的 Score SDE 形式：
+\[
+\frac{\diff \rvx(t)}{\diff t}
+= f(t) \rvx(t)  -  \frac{1}{2} g^2(t) \rvs^*(\rvx(t),t).
+\]
+
+为了给读者一个关于 PF-ODE 如何被离散化以进行采样的具体感受，我们将在 \Cref{sec:revisit-ddim} 中介绍一种广泛使用的基于扩散的 ODE 采样器——DDIM 方案的更新规则。这个例子将展示 Euler 离散化如何自然地与 PF-ODE 联系起来.
+
+
+
+
+
+
+
+\subsection{所有仿射流都是等价的}\label{subsec:all-flows-are-equiv}
+我们接下来分析 \Cref{eq:general-dm-loss-D} 中组件 (A) 的设计选择。
+
+\paragraph{状态层面的等价性。}
+FM~\citep{lipman2022flow} 和 RF~\citep{liu2022rectified} 中使用的一种方便的规范插值是
+\[
+\rvx_t^{\mathrm{FM}}=(1-t) \rvx_0+t \beps = \rvx_{0}+t(\beps-\rvx_0),
+\]
+其速度是常向量 $\beps-\rvx_0$。本小节的要点是，这一选择表面上的简洁性并非本质所在：任何仿射插值
+\[
+\rvx_t=\alpha_t \rvx_0+\sigma_t \beps
+\]
+都可以写成规范路径的时间重参数化和缩放版本。定义
+\[
+c(t):=\alpha_t+\sigma_t,
+\qquad
+\tau(t):=\frac{\sigma_t}{\alpha_t+\sigma_t}
+\quad\big(c(t)\neq 0\big).
+\]
+直接的代数改写给出
+\begin{align*}
+\rvx_t
+&=\alpha_t \rvx_0+\sigma_t \beps
+\\
+&=\big(\alpha_t+\sigma_t\big) \left(\frac{\alpha_t}{\alpha_t+\sigma_t}\rvx_0+\frac{\sigma_t}{\alpha_t+\sigma_t}\beps\right) \\
+&=c(t) \left(\big(1-\tau(t)\big)\rvx_0+\tau(t)\beps\right)
+=c(t) \rvx_{\tau(t)}^{\mathrm{FM}}.
+\end{align*}
+因此每条仿射路径都是规范 FM 路径在变量替换 $t\mapsto\tau(t)$ 和空间缩放 $\rvx\mapsto c(t)\rvx$ 下的像。该等式逐点成立，因此在分布意义上也成立。
+
+对于相关的速度，对 $\rvx_t=c(t)\rvx_{\tau(t)}^{\mathrm{FM}}$ 应用链式法则：
+\begin{align*}
+\rvv(\rvx_t,t)
+&:= \frac{\diff}{\diff t}\left(\alpha_t\rvx_0 +\sigma_t \beps\right)
+\\&=\frac{\diff}{\diff t}\big(c(t)\rvx_{\tau(t)}^{\mathrm{FM}}\big)
+\\
+&=c'(t) \rvx_{\tau(t)}^{\mathrm{FM}}+c(t) \tau'(t) \frac{\diff}{\diff s}\rvx^{\mathrm{FM}}_{s}\bigg|_{s=\tau(t)} \\
+&=c'(t) \rvx_{\tau(t)}^{\mathrm{FM}}+c(t) \tau'(t) \rvv^{\mathrm{FM}} \left(\rvx_{\tau(t)}^{\mathrm{FM}},\tau(t)\right),
+\end{align*}
+因为在规范路径上 $\rvv^{\mathrm{FM}}(\rvx^{\mathrm{FM}}_{\tau},\tau)=-\rvx_0+\beps$。
+
+我们将上述推导总结为如下命题中的形式化陈述。
+
+\proppnp{仿射流的等价性}{equiv-interpolation}{
+设 $\rvx_t^{\mathrm{FM}}=(1-t)\rvx_0+t \beps$ 和 $\rvx_t=\alpha_t\rvx_0+\sigma_t\beps$，其中 $c(t):=\alpha_t+\sigma_t\neq 0$ 且 $\tau(t):=\sigma_t/(\alpha_t+\sigma_t)$。则
+\begin{align}\label{eq:fm-general-affine-formula}
+\begin{aligned}
+\rvx_t&=c(t) \rvx_{\tau(t)}^{\mathrm{FM}},\\
+\rvv(\rvx_t,t)
+&=c'(t) \rvx_{\tau(t)}^{\mathrm{FM}}
+ + c(t) \tau'(t) \rvv^{\mathrm{FM}} \left(\rvx_{\tau(t)}^{\mathrm{FM}},\tau(t)\right).
+\end{aligned}
+\end{align}
+特别地，所有仿射插值在相差时间重参数化和空间缩放的意义下都是等价的。
+}
+\subparagraph{与三角流的等价性。}
+另一种广泛使用的仿射流是三角插值~\citep{salimans2021progressive,albergo2023stochastic,lu2024simplifying}。
+作为一个具体例子，我们也证明\emph{任何}仿射流都可以表示为这种形式。
+三角路径定义为
+\begin{align}\label{eq:trig-para}
+\rvx^{\mathrm{Trig}}_u := \cos(u) \rvx_0 + \sin(u)\beps .
+\end{align}
+令 $R_t := \sqrt{\alpha_t^2 + \sigma_t^2}$ 并假设 $R_t>0$。选取角度 $\tau_t$ 使得
+\[
+\cos \tau_t = \frac{\alpha_t}{R_t},
+\qquad
+\sin \tau_t = \frac{\sigma_t}{R_t}.
+\]
+那么每个仿射插值 $\rvx_t=\alpha_t\rvx_0+\sigma_t\beps$ 都是一个经过缩放和重新计时（re-timed）的三角路径：
+\begin{align}\label{eq:any-to-trig}
+\rvx_t
+= \alpha_t\rvx_0+\sigma_t\beps
+= R_t \left(\frac{\alpha_t}{R_t}\rvx_0+\frac{\sigma_t}{R_t}\beps\right)
+= R_t \rvx^{\mathrm{Trig}}_{\tau_t}.
+\end{align}
+数对 $(\alpha_t,\sigma_t)$ 是平面上的一个点。用 $R_t$ 归一化后它落在单位圆上，这就固定了角度 $\tau_t$ 从而固定了状态 $\rvx^{\mathrm{Trig}}_{\tau_t}$；半径 $R_t$ 给出了整体尺度。
+
+将 $\rvx^{\mathrm{Trig}}_u$ 对 $u$ 求导得到其速度，
+\[
+\rvv^{\mathrm{Trig}}_u = -\sin(u) \rvx_0 + \cos(u) \beps.
+\]
+通过与 \Cref{eq:any-to-trig} 中相同的变量替换，这一关系为速度（类似地为其他参数化）提供了闭式转换。
+
+
+综合上述讨论，我们得到如下结论：
+\msg{结论}{}{无论采用何种调度 $(\alpha_t,\sigma_t)$，包括 VE、VP（如三角调度）、FM 或 RF，仿射插值都可以通过适当的时间变量替换和标量缩放相互转换。}
+
+
+
+\paragraph{四种参数化的训练目标。}
+设 $\rvx_t=\alpha_t \rvx_0+\sigma_t \beps$，其中 $\sigma_t>0$ 且 $(\alpha_t,\sigma_t)$ 可微并满足 $\alpha_t'\sigma_t-\alpha_t\sigma_t'\neq 0$。考虑 oracle 目标
+\[
+\beps^*(\rvx_t,t)=\E[\beps|\rvx_t],\quad 
+\rvx_0^*(\rvx_t,t)=\E[\rvx_0|\rvx_t],\quad
+\rvv^*(\rvx_t,t)=\E[\alpha_t'\rvx_0+\sigma_t'\beps|\rvx_t].
+\]
+由命题~\ref{equi-para}，它们满足
+\[
+\nabla_{\rvx_t}\log p_t(\rvx_t)
+= -\frac{1}{\sigma_t} \beps^*(\rvx_t,t)
+= \frac{\alpha_t}{\sigma_t^2} \left(\rvx_0^*(\rvx_t,t)-\frac{\rvx_t}{\alpha_t}\right),
+\quad
+\rvv^*=\alpha_t' \rvx_0^*+\sigma_t' \beps^*.
+\]
+在头部转换
+\[
+\rvs_{\bphi} \equiv -\frac{1}{\sigma_t} \beps_{\bphi}
+\equiv \frac{\alpha_t}{\sigma_t^2} \left(\rvx_{\bphi}-\frac{\rvx_t}{\alpha_t}\right),
+\]
+之下，速度到分数的转换为
+\[
+\rvs_{\bphi}
+= \frac{\alpha_t}{\sigma_t(\alpha_t'\sigma_t-\alpha_t\sigma_t')} \rvv_{\bphi}
+- \frac{\alpha_t'}{\sigma_t(\alpha_t'\sigma_t-\alpha_t\sigma_t')} \rvx_t,
+\]
+逐样本的平方损失仅相差时间相关权重：
+\begin{align}\label{eq:s-e-x-v-equi}
+\begin{aligned}
+\big\|\rvs_{\bphi}-\nabla_{\rvx_t}\log p_t(\rvx_t)\big\|_2^2
+&=\frac{1}{\sigma_t^2} \big\|\beps_{\bphi}-\beps^*\big\|_2^2 \\
+&=\frac{\alpha_t^2}{\sigma_t^4} \big\|\rvx_{\bphi}-\rvx_0^*\big\|_2^2 \\
+&=\left(\frac{\alpha_t}{\sigma_t(\alpha_t'\sigma_t-\alpha_t\sigma_t')}\right)^{ 2}
+\big\|\rvv_{\bphi}-\rvv^*\big\|_2^2 .
+\end{aligned}
+\end{align}
+
+由命题~\ref{equiv-interpolation}，任何仿射流 $\rvx_t=\alpha_t\rvx_0+\sigma_t\beps$
+都可通过 $\rvx_t=c(t)\rvx^{\mathrm{FM}}_{\tau(t)}$ 转换到规范 FM 路径，其中
+$c(t)=\alpha_t+\sigma_t$ 且 $\tau(t)=\sigma_t/(\alpha_t+\sigma_t)$。求导给出
+\[
+\rvv_{\bphi}(\rvx_t,t)=c'(t)\rvx^{\mathrm{FM}}_{\tau(t)}
++c(t)\tau'(t)\rvv^{\mathrm{FM}}_{\bphi} \left(\rvx_{\tau(t)}^{\mathrm{FM}},\tau(t)\right),
+\qquad
+\rvx_{\tau(t)}^{\mathrm{FM}}=\frac{\rvx_t}{c(t)},
+\]
+并且同样的关系对 $\rvv^*$ 成立。因此速度损失的变换为
+\begin{align*}
+    &\big\|\rvv_{\bphi}(\rvx_t,t)-\rvv^*(\rvx_t,t)\big\|_2^2
+\\= &\big(c(t) \tau'(t)\big)^2
+\Big\|\rvv^{\mathrm{FM}}_{\bphi} \left(\frac{\rvx_t}{c(t)},\tau(t)\right)
+-\big(\rvv^{\mathrm{FM}}\big)^* \left(\frac{\rvx_t}{c(t)},\tau(t)\right)\Big\|_2^2.
+\end{align*}
+
+基于上述观察，我们得到如下结论：
+\msg{结论}{}{分数、噪声、干净数据和速度的训练目标在理论上仅相差由 $(\alpha_t,\sigma_t)$ 决定的时间相关权重（对速度而言，还相差一个涉及 $\rvx_t$ 的仿射头部转换）。}
+
+
+\subsection{（选读）参数化与规范流的概念性分析}\label{subsec:concept-why-v-affine}
+尽管我们在前几节中已经表明，所有四种参数化在数学上等价并可以相互转换，且前向仿射噪声注入流等价于规范形式
+\[
+\rvx_t^{\mathrm{FM}} = (1-t) \rvx_0 + t \beps,
+\]
+在本小节中我们提供进一步的直觉，并分析使用 $\rvv$-预测参数化与这一规范仿射流结合时的潜在优势。
+
+
+本小节提出一个简单的问题：\emph{不同的参数化和调度如何塑造模型所学的内容以及我们采样的方式？} 我们从两个视角展开：
+\begin{itemize}
+  \item \textbfs{回归目标与调度。} 我们关注为何将 $\rvv$-预测与规范线性调度 $(\alpha_t,\sigma_t)=(1-t,t)$ 结合是自然的：它随时间保持稳定的目标尺度，并消除动力学中的曲率效应。
+  \item \textbfs{对求解器的影响。} 我们考察这一参数化在概念上如何与数值积分方案相互作用，而将具体例子（如 Euler 求解器和 Heun 方法）推迟到 \Cref{subsec:ddim-different-para,subsec:dpm-heun}。
+\end{itemize}
+
+在展开之前，为避免歧义，我们区分两类速度场。\emph{条件速度}（作为可处理的训练目标）定义为
+\[
+\rvv_t(\rvx_t |\rvz) = \rvx_t' = \alpha_t' \rvx_0 + \sigma_t' \beps, 
+\quad \text{其中 } \rvz = (\rvx_0, \beps),
+\]
+而\emph{oracle（边缘化）速度}（在 PF-ODE 求解的推理阶段用于移动样本）由下式给出
+\[
+\rvv^*(\rvx, t) = \E\big[\rvv_t(\cdot |\rvz)  \big|  \rvx_t = \rvx\big].
+\]
+
+\paragraph{视角一：为何 $(\alpha_t,\sigma_t)=(1-t,t)$ 是自然的调度。}
+将 $\sigma_t:=\rho(t)$ 和 $\alpha_t:=1-\rho(t)$ 写成关于时变 $\rho(t)$ 的形式，条件速度变为
+\[
+\rvv_t(\rvx_t |\rvz)
+=\rho'(t)(\beps-\rvx_0),
+\quad\text{其中 } \rvz=(\rvx_0,\beps).
+\]
+
+
+\subparagraph{单位尺度的回归目标。}
+对于规范调度 $\rho(t)=t$，条件速度 $\rvv_t(\cdot |\rvz)$ 满足
+\begin{align}\label{eq:unit-velocity}
+\mathbb{E}\left[\|\rvv_t(\cdot |\rvz)\|_2^2\right]
+=\E_{\beps}\norm{\beps}_2^2+\E_{\rvx_0}\norm{\rvx_0}^2_2 = D + \underbrace{\Tr\Cov[\rvx_0]}_{\text{total variance}}+\underbrace{\norm{\E\rvx_0}^2_2}_{\text{mean}}.
+\end{align}
+因此期望的目标幅值关于 $t$ 是常数。在将数据标准化为零均值和单位协方差（即 $\Cov[\rvx_0]=\rmI$）之后，两个分量
+$\alpha_t'\rvx_0$ 和 $\sigma_t'\beps$ 对所有 $t$ 都贡献相当，避免了端点附近的梯度爆炸/消失。
+为了看清这一点，我们考虑扩散的训练目标：
+\[
+\mathcal{L}_{\mathrm{velocity}}(\bphi)
+= \E_{t}  \E_{\rvx_0,\beps}\left[\big\|\rvv_{\bphi}(\rvx_t,t) - \rvv_t(\rvx_t|\rvz)\big\|_2^2
+\right].
+\]
+应用链式法则，该损失关于模型参数 $\bphi$ 的梯度为
+\[
+\nabla_{\bphi}\mathcal{L}_{\mathrm{velocity}}(\bphi)
+= 2  \E_{t}  \E_{\rvx_0,\beps} \left[
+  \partial_{\bphi}\rvv_{\bphi}(\rvx_t,t)^{\top} \left(\rvv_{\bphi}(\rvx_t,t) - \rvv_t(\rvx_t|\rvz)\right)
+\right].
+\]
+因此目标 $\|\rvv_t(\rvx_t|\rvz)\|_2$ 的尺度影响梯度稳定性：
+如果在某个 $t$ 处它塌缩为 $0$（或爆炸），那么（在其他条件相同时）梯度倾向于消失（或爆炸）。采用规范选择 $\rho(t)=t$ 时，
+\Cref{eq:unit-velocity} 给出一个与 $t$ 无关的目标幅值，因此不会出现由回归信号引起的端点（$t=0$ 或 $t=1$）塌缩或爆炸
+（假设 $\E\|\partial_{\bphi}\rvv_{\bphi}(\rvx_t,t)\|^2$ 和任何时间权重都是受控的）。
+
+
+\subparagraph{规范调度与 $\rvv$-预测的相互作用。}
+在仿射路径 $\rvx_t=\alpha_t \rvx_0+\sigma_t\beps$ 下，oracle 速度分解为
+\[
+\rvv^*(\rvx, t)=\alpha_t' \rvx^*(\rvx,t)+\sigma_t' \beps^*(\rvx,t),
+\]
+其中 $\rvx^*=\E[\rvx_0|\rvx_t=\rvx]$ 且 $ \beps^*=\E[\beps|\rvx_t=\rvx]$。
+在固定 $\rvx$ 下求导给出
+\[
+\partial_t \rvv^*
+=\underbrace{\alpha_t'' \rvx^*+\sigma_t'' \beps^*}_{\text{schedule curvature}}
++ \alpha_t' \partial_t \rvx^*+\sigma_t' \partial_t \beps^*.
+\]
+采用线性调度 $\alpha_t=1-t,\ \sigma_t=t$ 时，曲率项消失
+（$\alpha_t''=\sigma_t''=0$），因此 $\rvv^*$ 的时间变化主要反映后验演化 $(\partial_t \rvx^*,\partial_t \beps^*)$ 而非调度本身。
+这一效应对于 $\rvv$-预测尤为干净：系数 $\alpha_t',\sigma_t'$
+是常数（$-1$ 和 $+1$），避免了漂移中额外的随 $t$ 变化的缩放。
+相比之下，分数、$\rvx_0$ 或 $\beps$ 参数化通常会引入诸如
+$\sigma_t'/\sigma_t$ 或 $\alpha_t'/\alpha_t$ 这样的比值，它们即使在线性调度下也可能在端点附近剧烈变化。
+因此，尽管理论上并非独有，但线性 $(1-t,t)$ 调度与 $v$-预测相结合，为 oracle 速度提供了一种特别稳定且透明的时间依赖关系。
+
+\subparagraph{最小化条件能量。} 我们接下来采用最优传输（见 \Cref{ch:ot-eot}）的更理论化的视角。
+这里，\emph{条件动能}度量条件速度沿前向路径的总期望运动，
+即从 $\rvx_0$ 跨越到 $\beps$ 所需的瞬时运动（或动能耗费）总量：
+\[
+\mathcal K[\rho]
+:=\int_0^1 \E_{\rvx_0,\beps}\!\big[\|\rvv_t(\cdot |\rvz)\|_2^2\big]\diff t
+=\Big(D+\Tr\Cov[\rvx_0]+\|\E\rvx_0\|_2^2\Big)
+\int_0^1 \big(\rho'(t)\big)^2\diff t.
+\]
+因此最小化 $\mathcal K[\rho]$ 对应于在仿射插值族
+\[
+\rvx_t=(1-\rho(t))\rvx_0+\rho(t)\beps.
+\]
+内寻找期望意义下最平滑、能量最少的路径。
+在边界条件 $\rho(0)=0$ 和 $\rho(1)=1$ 下，Euler--Lagrange 方程 $\rho''(t)=0$ 给出最小化解 $\rho(t)=t$，对应于一条直的条件路径。
+这意味着，在该族中所有平滑调度 $\rho$ 之中，
+规范流 $\rho(t)=t$ 是从 $\rvx_0$ 移动到 $\beps$ 的最节能方式。
+我们将在命题~\ref{ot-conditional-flow} 中重新讨论这一点，给出更详细的处理。
+
+
+\subparagraph{关于 oracle 速度的注记。}
+如果我们改为评估由边缘速度定义的能量
+\[
+\int_0^1 \E_{\rvx_t} \big[\|\rvv^*(\rvx_t, t)\|^2\big]\diff t,
+\]
+那么取 $\rvz=(\rvx_0,\beps)$ 且 $\rvv_t(\rvx_t |\rvz)=\rho'(t)(\beps-\rvx_0)$ 时，
+\[
+\rvv^*(\rvx, t)
+=\E[\rvv_t(\cdot|\rvz)|\rvx_t=\rvx]
+=\rho'(t) \E[\beps-\rvx_0|\rvx_t=\rvx];
+\]
+因此边缘速度的能量变为
+\begin{align*}
+  \int_0^1 \E_{\rvx_t\sim p_t} \big[\|\rvv^*(\rvx_t, t)\|^2_2\big]\diff t
+   = \int_0^1 \E_{\rvx_t} \big[\| \rho'(t) \E[\beps-\rvx_0|\rvx_t] \|^2_2\big]\diff t  = \int_0^1 \big(\rho'(t)\big)^2 \kappa(t) \diff t,
+\end{align*}
+其中 $\kappa(t):=\E_{\rvx_t\sim p_t} \left[\big\|\E[\beps-\rvx_0|\rvx_t]\big\|^2_2\right]
+$。
+
+因此，\emph{边缘}最优调度 $\rho(t)$ 未必是线性的。
+它为线性的充要条件是 $\kappa(t)$ 为常数；一般地，Euler–Lagrange 条件
+\[
+(\kappa(t)\rho'(t))' = 0  \Rightarrow  \rho'(t)\propto \frac{1}{\kappa(t)}
+\]
+意味着 oracle 最优调度会自适应地重参数化时间。
+直观地说，$\kappa(t)$ 度量了标签 $(\beps-\rvx_0)$ 中可由 $\rvx_t\sim p_t$ 预测的部分：
+oracle 流在 $\kappa(t)$ 大的地方放慢，反映 oracle 速度期望幅值大的区域；在 $\kappa(t)$ 小的地方加快。
+因此，尽管条件流使用线性调度 $(1-t,t)$，
+相应的边缘化（oracle）动力学一般是非线性的。
+
+
+
+\paragraph{视角二：为何速度预测可被视为对采样是自然的。}
+
+\subparagraph{$\rvx$-、$\beps$-、$\rvs$-预测下 PF-ODE 的半线性形式。}
+在干净数据、噪声和分数参数化下，漂移项具有半线性形式（见 \Cref{eq:clean_pf_ode} 中前三个恒等式）：
+\[
+\frac{\diff \rvx(t)}{\diff t}= \underbrace{L(t) \rvx(t)}_{\text{linear part}} + \underbrace{\rmN_\bphi(\rvx(t),t)}_{\text{nonlinear part}},
+\quad
+\rmN_\bphi\in\{\rvx_{\bphi}, \beps_{\bphi}, \rvs_{\bphi}\}.
+\]
+
+
+
+当线性漂移 $L(t) \rvx(t)$ 在某些方向上驱动 $\rvx(t)$ 变化的速率与非线性部分相差悬殊时，系统就是\emph{刚性}的，这意味着漂移关于 $\rvx$ 的 Jacobian
+\[
+\rmJ(\rvx,t):=L(t)+\nabla_{\rvx}\rmN_\bphi(\rvx,t)
+\]
+的特征值的实部相差若干数量级（更大的幅值对应更快的方向）\footnote{%
+设 PF–ODE 的漂移为 $\rmF(\rvx,t)=L(t) \rvx+\rmN_{\bphi}(\rvx,t)$，并假设
+$\rmN_{\bphi}$ 关于 $\rvx$（局部）Lipschitz，常数为 $\mathrm{Lip}_{\rmN_{\bphi}}(t)$。
+对邻近状态 $\rvx,\rvy$，
+\[
+\|\rmF(\rvx,t)-\rmF(\rvy,t)\|
+\le \underbrace{\big(\|L(t)\|+\mathrm{Lip}_{\rmN_{\bphi}}(t)\big)}_{=:~C(t)} \|\rvx-\rvy\|.
+\]
+等价地，关于 $\rvx$ 的 Jacobian
+\[
+\rmJ(\rvx,t)=L(t)+\nabla_{\rvx}\rmN_\bphi(\rvx,t)
+\]
+满足 $\|\rmJ(\rvx,t)\|_{\mathrm{op}} \le C(t)$（即由 $\R^D$ 上欧氏范数诱导的算子范数）。因此 $\rmJ$ 所有特征值的实部在幅值上以 $C(t)$ 为界。
+于是大的 $C(t)$ 意味着快的局部速率，所以显式求解器需要很小的步长（$h\lesssim 1/C(t)$）。}。例如，动力学可能在 $\rvx(t)$ 中同时包含“快线性”变化和“慢非线性”变化。在这种情形下，显式求解器必须采用非常小的时间步才能保持数值稳定。
+
+
+
+
+为了应对这种失衡，高阶的稳定求解器通常会应用一个\emph{积分因子}，
+将线性项 $L(t) \rvx$ 解析地处理，只对较慢的非线性余项进行离散化，尽管这要以额外的代数和实现复杂性为代价。\Cref{ch:solvers} 专门详细讨论这一主题。
+
+
+\subparagraph{$\rvv$-预测下的 PF-ODE。} 在 $\rvv$-预测下，模型直接学习速度场并积分
+\[
+\frac{\diff \rvx(t)}{\diff t}
+=\rvv_{\bphi}(\rvx(t),t)
+\approx \rvv^*(\rvx(t),t).
+\]
+在这一表述中，显式的线性项被吸收进单一的学习场中，
+因此动力学不再分裂为多个部分。于是步长由所学场 $\rvv_{\bphi}(\rvx,t)$ 随 $\rvx$ 和 $t$ 变化的平滑程度所决定，而不是由一个预先指定的标量系数 $L(t)$ 的幅值决定。换言之，潜在快速的线性漂移被折叠进一个连贯的速度场，从而减小了时间尺度上的差异并简化了数值积分。
+
+
+稍后在 \Cref{subsec:ddim-different-para} 中，我们将用一个简单的例子说明
+$\rvv$-预测在采样过程中的结构性简洁性。
+为了得到与 DDIM~\citep{song2020denoising}（扩散建模中最广泛使用的快速采样器之一）相同的 PF-ODE 离散化更新，
+在 $\beps$-、$\rvx$- 或 $\rvs$-参数化下的普通 Euler 步只能\emph{近似}线性项而非精确计算它
+（见 \Cref{eq:euler-step}）。因此，这些参数化需要一种更高级的方法——\emph{指数积分器}——来分离并精确计算线性项。
+相比之下，在 $\rvv$-预测下，PF-ODE 漂移中没有可分离的线性项，因此普通的 Euler 更新自然地与 DDIM 表述一致。一个密切相关的类比出现在 \Cref{subsec:dpm-heun}：二阶 DPM-Solver~\citep{lu2022dpm}
+与经典的 Heun 方法一致：对 $\rvv$-预测这是普通的 Heun，
+而对 $\beps$-、$\rvx$- 或 $\rvs$-预测则是指数 Heun。详细讨论留待各自的小节。
+
+
+
+我们指出，生成上的任何改进（例如在 PF-ODE 求解中以更少的模型求值获得更高的样本质量）
+都取决于 $\rvv_{\bphi}$ 逼近 oracle 速度的准确程度，以及采样算法（包括数值积分器、离散化调度和步长控制）与之交互的有效程度。因此，采用 $\rvv$-参数化本身并不能保证更好的采样性能。
+
+
+
+
+\paragraph{结论。}
+尽管 $\rvv$-预测与规范线性调度相结合提供了某些理论上的优势（如常数目标幅值和不存在调度曲率），但这些性质未必使其在普适意义上更优。在实践中，模型性能取决于一系列相互作用的因素，包括网络架构、归一化方案、随时间的损失加权、采样器和离散化步数的选择、引导强度、正则化策略、数据缩放以及总体训练预算。不同的数据集和目标可能青睐其他参数化或调度，而最优配置最终是一个经验问题，应当通过验证和消融研究来确定。
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\clearpage
+\newpage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+\section{万变不离其宗：Fokker–Planck 方程}\label{sec:comparison-connection}
+
+
+\begin{figure}[htbp]
+\begin{center}
+\scalebox{0.9}{ 
+\centering
+\begin{tikzpicture}[
+    node distance=1.5cm,
+    box/.style={draw, rounded corners=8pt, minimum width=4.5cm, minimum height=1.2cm, align=center, font=\footnotesize},
+    section/.style={draw, thick, minimum width=12cm, minimum height=3cm, align=center},
+    central/.style={draw, thick, fill=gray!10, minimum width=8cm, minimum height=1.5cm, align=center},
+    arrow/.style={->, ultra thick, >=Stealth},
+    bidir/.style={<->, thick, >=Stealth},
+    label/.style={font=\small, align=center}
+]
+
+% Forward Process Section
+\node[section] (forward_section) at (0, 4) {\\ \\ \\ \\ \\ \\ \small $t = 0$ 时从 $p_{\mathrm{data}}$ 出发的前向};
+\node[font=\Large\sffamily\bfseries] at (0, 5.1) {前向过程};
+
+\node[box] (var_forward) at (-3.5, 4) {
+    \textbfs{变分方法：}\\
+    定义 $p(\mathbf{x}_t|\mathbf{x}_{t-\Delta t})$，或\\
+    $p_t(\mathbf{x}_t|\mathbf{x}_0) \Leftrightarrow \mathbf{x}_t = \alpha_t \mathbf{x}_0 + \sigma_t \boldsymbol{\epsilon}$
+};
+
+\node[box] (sde_forward) at (3.5, 4) {
+    \textbfs{前向 SDE：}\\
+    $\diff\mathbf{x}(t) = f(t)\mathbf{x}(t)\diff t + g(t)\diff \rvw(t)$
+};
+
+% Central Equation
+\node[central] (central) at (0, 1) {
+    \textbfs{连续性方程 / Fokker–Planck 方程}\\
+    关于 $p_t(\mathbf{x})$
+};
+
+% Reverse Process Section
+\node[section] (reverse_section) at (0, -3) [minimum height=5.2cm] {\\ \\ \\ \\  \\ \\ \\ \\ \\ \\ \small $t = T$ 时从 $p_{\mathrm{prior}}$ 出发的反向};
+\node[font=\Large\sffamily\bfseries] at (0, -0.8) {反向过程}; % Moved down slightly
+
+\node[box, minimum width=3.6cm] (var_reverse) at (-4.0, -2.0) {
+    \textbfs{变分方法：}\\
+    $p(\mathbf{x}_{t-\Delta t}|\mathbf{x}_t)$\\ 由贝叶斯法则给出
+};
+
+\node[box] (ode) at (3, -4.3) {
+    \textbfs{PF-ODE：}\\
+    $\diff\mathbf{x} (t) = \mathbf{v}^*(\mathbf{x} (t), t)\diff t$
+};
+
+\node[box] (sde_reverse) at (3, -2.0) {
+    \textbfs{反向 SDE：}\\
+    $\diff\bar{\mathbf{x}}  = \left[\mathbf{v}^* - \frac{1}{2}\gamma^2(t)\mathbf{s}^*\right]\diff t + \gamma(t)\diff\bar{ \rvw}(t)$
+};
+
+% Arrows from sections to central equation
+\draw[arrow] ($(forward_section.south)+(0,-0.)$) -- ($(central.north)+(0,0.)$);
+\draw[arrow] ($(reverse_section.north)+(0,0.)$) -- ($(central.south)+(0,-0.)$);
+
+% Bidirectional arrow between forward approaches
+\draw[bidir] (var_forward) -- (sde_forward) node[midway, above, label] {Lemma~\ref{forward-sde}};
+
+% Connections in reverse section
+
+% From var_reverse to sde_reverse (slightly curved down)
+\draw[->, thick, >=Stealth]
+    ($(var_reverse.east)+(0,0.1)$) -- ($(sde_reverse.west)+(-0,0.1)$)
+    node[midway, above, label] { $\Delta t \to 0$ };
+
+% From sde_reverse to var_reverse (slightly curved up)
+\draw[->, thick, >=Stealth]
+    ($(sde_reverse.west)+(0,-0.2)$) -- ($(var_reverse.east)+(0,-0.2)$)
+    node[midway, below, label] {\scriptsize{离散化}};
+
+% Vertical arrow from sde_reverse to ode (going up)
+\draw[->, thick, >=Stealth]
+    ($(sde_reverse.south)+(0, 0)$) -- ($(ode.north)+(0, 0)$)
+    node[midway, right] {$\gamma \equiv 0$};
+
+% Vertical arrow from ode to sde_reverse (going down)
+\draw[->, thick, >=Stealth]
+    ($(ode.north)+(-0.4, 0)$) -- ($(sde_reverse.south)+(-0.4, 0)$)
+    node[midway, left] {$\gamma \not\equiv 0$};
+
+
+\end{tikzpicture}
+}
+\end{center}
+\caption{\textbfs{通过连续性方程将变分、SDE 与 ODE 三种表述统一起来的视角，其中所有 $p_t(\rvx)$ 在共享的动力学下演化。} 速度场 $\rvv^*(\rvx, t) = f(t)\rvx - \frac{1}{2}g^2(t)\rvs^*(\rvx, t)$ 由分数函数 $\rvs^*(\rvx, t) := \nabla_\rvx \log p_t(\rvx)$ 决定。系数 $f(t)$、$g(t)$、$\sigma_t$ 和 $\alpha_t$ 是预先定义的时间相关函数，$\gamma(t)$ 是一个可调的时间相关超参数。
+\figcredit{由作者绘制。}}
+\label{fig:unified_framework}
+\end{figure} 
+
+
+
+
+
+本节中，我们表明扩散模型的三个主要视角——基于变分、基于分数和基于流——并非彼此分离的构造，而是源于同一个统一原理：在所选前向过程下统辖密度演化的连续性（Fokker–Planck）方程。
+
+
+首先，我们回顾 \Cref{eq:heuristic-fpe-sde} 中的分析：它将基于离散核和贝叶斯法则的变分视角，与基于连续动力学的 Score SDE 视角统一起来。我们建立这一联系的方式是证明变分模型充当底层前向和反向 SDE 的一致离散化。具体而言，通过离散核逐步计算得到的边缘密度，其演化方式与统辖连续时间动力学的 Fokker–Planck 方程相一致。这证实了两种视角在根本上是等价的。
+
+
+
+ 
+ 接下来，我们将基于流和基于分数的视角联系起来。在 \Cref{subsec:flow-score} 中，我们表明一个 ODE 流确定了一条密度路径，其边缘总可以被一族随机过程实现。这将确定性流和随机 SDE 置于同一个族中。
+
+这些结果共同将三种视角统一在同一个框架之下（见 \Cref{fig:unified_framework}）。最后，我们在 \Cref{subsec:takeaway-dm-gaussianfm} 中结束本章。
+
+
+
+% \subsection{Connection of Variational Approach and Score SDE}\label{subsec:var-score}
+% In this section we show that forward and reverse marginals obey the same Fokker–Planck structure, with time reversal arising naturally from the variational approach. Starting from the discrete time formulation of variational diffusion models (such as DDPM), we apply Bayes’ rule to derive the reverse marginal density path. This path, initialized at the forward-diffused distribution $p_T$, exactly retraces the forward process in reverse. From \Cref{eq:heuristic-fpe-sde}, the forward density path $p_t$ is known to satisfy the Fokker–Planck equation for all $t\in(0,T]$. Combining these observations, we conclude that both the forward and reverse density paths, viewed variationally, are governed by the same Fokker–Planck dynamics.
+
+
+
+% \paragraph{Reverse One-Step Kernel and Reverse Marginals.}
+
+% From \Cref{subsec:fpe-reason} we have the forward one-step kernel
+% \[
+% p(\rvx_{t+\Delta t}|\rvx_t=\rvy)
+% =\mathcal N \big(\rvx_{t+\Delta t}; \rvy+\rvf(\rvy,t)\Delta t,  g^2(t)\Delta t \rmI\big),
+% \]
+% whose induced marginals satisfy the Fokker–Planck equation as $\Delta t\to0$.  
+% The Taylor–Gaussian smoothing argument there justifies using first–order expansions in $\Delta t$ below.
+
+
+% By Bayes’ rule, for any $\Delta t>0$,
+% \[
+% p(\rvx_{t-\Delta t}=\rvy |\rvx_t=\rvx)
+% =\frac{p(\rvx_t=\rvx |\rvx_{t-\Delta t}=\rvy)  p_{t-\Delta t}(\rvy)}{p_t(\rvx)}.
+% \]
+% Starting the reverse chain from $p^{\mathrm{rev}}_0:=p_T$, one checks that for any measurable $A\subset\mathbb R^D$,
+% \[
+% p^{\mathrm{rev}}_{\Delta t}(A)
+% =\int p(\rvx_{t-\Delta t}\in A |\rvx_t=\rvx) p_t(\rvx) \diff\rvx
+% =\int \mathbf 1_A(\rvy) p_{t-\Delta t}(\rvy) \diff\rvy.
+% \]
+% Hence $p^{\mathrm{rev}}_{\Delta t}=p_{t-\Delta t}$, and iterating gives
+% \[
+% p^{\mathrm{rev}}_{k\Delta t}=p_{T-k\Delta t}\qquad (k\in\mathbb Z_{\ge0}).
+% \]
+% Taking $\Delta t\to0$ yields the exact identity
+% \[
+% p^{\mathrm{rev}}_s = p_{T-s},\qquad 0\le s< T.
+% \]
+
+% \paragraph{Reverse Marginals and the Fokker–Planck.}
+% Because $p_t$ satisfies the forward Fokker–Planck
+% \[
+% \partial_t p_t(\rvx)
+% = -\nabla_{\rvx} \cdot \big(\rvf(\rvx,t) p_t(\rvx)\big)
+% + \frac{g^2(t)}{2} \Delta_{\rvx} p_t(\rvx),
+% \]
+% the identity $p^{\mathrm{rev}}_s=p_{T-s}$ immediately implies
+% \begin{align*}
+%     \partial_s p^{\mathrm{rev}}_s(\rvx)
+%     &= -\partial_t p_t(\rvx)\big|_{t=T-s}
+%     \\&= \nabla_{\rvx}\cdot \big(\rvf(\rvx,T-s) p^{\mathrm{rev}}_s(\rvx)\big)
+%     - \frac{g^2(T-s)}{2} \Delta_{\rvx} p^{\mathrm{rev}}_s(\rvx).
+% \end{align*}
+% Thus the reverse marginals satisfy the \emph{time–flipped Fokker–Planck equation}.  
+% No separate PDE derivation is needed: it follows directly from the Bayes identity.
+
+% \paragraph{(Sanity Check) Consistency with the Reverse–Time SDE.} 
+% The small–step Bayes expansion (see \Cref{subsec:reverse-sde-reason}) gives
+% \begin{align*} 
+% &p(\rvx_{t-\Delta t}|\rvx_t) \\=&\mathcal N \Big(\rvx_{t-\Delta t}; \rvx_t-\big[\rvf(\rvx_t,t)-g^2(t) \nabla_{\rvx}\log p_t(\rvx_t)\big]\Delta t, g^2(t)\Delta t \rmI\Big) + \mathcal O(\Delta t). 
+% \end{align*}
+% This is precisely the Euler--Maruyama update of the reverse-time SDE, with drift
+% \[
+% \rvf^{\rm rev}(\rvx,t)  =  \rvf(\rvx,t) - g^2(t) \nabla_{\rvx}\log p_t(\rvx),
+% \]
+% and diffusion coefficient $g(t)$. Reparametrizing forward in $s=T-t$, the corresponding marginals satisfy the Fokker-Planck equation
+% \[
+% \partial_s p^{\mathrm{rev}}_s
+% = -\nabla_{\rvx} \cdot \big(\rvf^{\rm rev}(\rvx,T-s)  p^{\mathrm{rev}}_s\big)
+% + \frac{g^2(T-s)}{2} \Delta_{\rvx} p^{\mathrm{rev}}_s,
+% \]
+% which coincides with the time–flipped form already obtained from Bayes’ rule.
+
+
+% \paragraph{Conclusion.}
+% The above analysis establishes a direct connection between the variational view (discrete kernels and Bayes inversion) and the score-based SDE view (continuous dynamics) through density evolution. Variational diffusion models can be interpreted as consistent discretizations of forward and reverse SDEs in the particle perspective, and their marginals evolve under the same Fokker–Planck law, showing that the two perspectives are fundamentally two sides of the same coin.
+
+
+% \paragraph{Forward Transition Kernel and Fokker-Planck Equation.}
+% As in \Cref{eq:transition-forward-f-g}, define the forward transition kernel\footnote{In the limit $\Delta t \to 0$, the discrete-time perturbation $p(\rvx_{t+\Delta t}|\rvx_t)$ recovers the infinitesimal transition dynamics of the forward SDE in \Cref{eq:sde_forward}.} as
+% \begin{align*}
+%     p(\rvx_{t+\Delta t}|\rvx_t) := \mathcal{N}\left(\rvx_{t+\Delta t}; \rvx_t + \rvf(\rvx_t, t)\Delta t, g^2(t) \Delta t \rmI\right).
+% \end{align*}
+% This induces the marginal density $p_t(\rvx) = \mathbb{E}_{\rvx_0 \sim p_{\mathrm{data}}}\left[p_t(\rvx|\rvx_0)\right]$, where $p_t(\rvx|\rvx_0)$ denotes the conditional perturbation kernel at time $t$. By applying a first-order Taylor expansion to the difference $p_{t+\Delta t}(\rvx) - p_t(\rvx)$ with respect to $\Delta t$ and an integration by parts, we obtain the following discrete-time approximation:
+% \begin{align*}
+%     \frac{p_{t+\Delta t}(\rvx) - p_{t}(\rvx)}{\Delta t} = -\nabla_\rvx \cdot \left[\rvf(\rvx, t)  p_t(\rvx)\right] + \frac{g^2(t)}{2} \Delta p_t(\rvx) + \mathcal{O}(\Delta t),
+% \end{align*}
+% where $\Delta p_t(\rvx)$ denotes the Laplacian of $p_t$ with respect to $\rvx$. This expression represents a time-discretized version of the Fokker-Planck equation. As $\Delta t \to 0$, the above expression converges to the continuous-time Fokker-Planck equation. 
+
+% \paragraph{Reverse Transition Kernel and Fokker-Planck Equation.}
+% Furthermore, in \Cref{subsec:reverse-sde-reason}, we conceptually derive the reverse-time transition using Bayes' rule. When $\Delta t \approx 0$, we have
+% \begin{align*}
+%     &p(\rvx_{t - \Delta t}|\rvx_t)\\
+% =~&p(\rvx_t|\rvx_{t - \Delta t}) \cdot \frac{p_{t - \Delta t}(\rvx_{t - \Delta t})}{p_t(\rvx_t)} \\
+% =~&p(\rvx_t|\rvx_{t - \Delta t}) \cdot \exp\left(\log p_{t - \Delta t}(\rvx_{t - \Delta t}) - \log p_t(\rvx_t)\right) \\
+%     \approx~&\mathcal{N}\left(\rvx_{t - \Delta t}; \rvx_t - \left[\rvf(\rvx_t, t) - g^2(t) \nabla_{\rvx_t} \log p_t(\rvx_t)\right] \Delta t, g^2(t) \Delta t \mathbf{I}\right) \cdot \left(1 + \mathcal{O}(\Delta t)\right),
+% \end{align*}
+% where we applied a first-order Taylor approximation. This is the Euler Maruyama step of the reverse time SDE in \Cref{eq:sde_backward} and it converges to the continuous-time reverse-time SDE as described in \Cref{eq:sde_backward}. In addition, by initializing the reverse-time dynamics with $p^{\text{rev}}_0 := p_T$, the reverse-time marginal density $p^{\text{rev}}_t$ satisfies
+% \[
+% p^{\text{rev}}_t = p_{T - t},
+% \]
+% which implies that $p^{\text{rev}}_t$ also follows the Fokker-Planck equation with time flipped (see \Cref{app-sec:scoresde-fpe-proof} for details).
+
+
+% These heuristic insights vividly reveal how the variational framework, exemplified by DDPM, emerges as a natural time-discretized counterpart to both the forward and reverse-time SDEs. Strikingly, the marginal densities in both directions evolve under the same discretized Fokker–Planck dynamics, underscoring a deep and elegant connection between discrete-time diffusion models and their continuous-time stochastic foundations. 
+
+% As illustrated in \Cref{fig:unified_framework}, this unified view emphasizes two key takeaways: (1) the variational approach is fundamentally a discretization of the SDE formulation, and (2) by matching the pre-specified marginal densities governed by the forward Fokker–Planck equation, we preserve the generative consistency across both discrete and continuous frameworks.
+
+
+
+
+\subsection{基于流的方法与 Score SDE 的联系}\label{subsec:flow-score}
+
+扩散模型的一个引人注目之处在于，不同的动力学系统——无论确定性还是随机性——都可以描绘出相同的概率分布演化。在本节中，我们揭示 \Cref{sec:flow-matching-framework} 中基于 ODE 的流与 Score SDE 之间一种自然而优雅的联系。具体而言，我们表明定义生成式 ODE 的速度场可以被转化为遵循相同 Fokker–Planck 动力学的随机对应物，从而在确定性插值与随机采样之间架起一座有原则的桥梁。这为我们提供了一族连续的模型，从 ODE 到 SDE，它们都生成相同的数据分布路径。
+
+我们考虑如下连续时间设定，其中扰动核为
+\[
+p_t(\rvx_t|\rvx_0) = \mathcal{N}(\rvx_t; \alpha_t \rvx_0, \sigma_t^2 \rmI),
+\]
+其中 $\rvx_0 \sim p_{\mathrm{data}}$。这一条件分布照常诱导出一条边缘密度路径 $p_t(\rvx_t) = \mathbb{E}_{\rvx_0 \sim p_{\mathrm{data}}}[p(\rvx_t|\rvx_0)]$，且 $p_T\approx p_{\mathrm{prior}}$。
+
+为匹配这条密度路径，考虑 ODE
+\begin{align}\label{eq:ode-velocity}
+    \frac{\diff\rvx(t)}{\diff t} = \mathbf{v}_t(\rvx(t)), \quad t \in [0,T],
+\end{align}
+其中 $\mathbf{v}_t(\rvx) =\E\left[\alpha_t'\rvx_0+\sigma_t'\beps|\rvx\right]$ 是 \Cref{eq:marginal-oracle-velocity} 所示的 oracle 速度（注意时间被翻转以遵循扩散模型的约定）。从 $\rvx(T)\sim p_{\mathrm{prior}}$ 反向积分 \eqref{eq:ode-velocity} 即可得到来自 $p_0$ 的样本。
+
+尽管这一 ODE 已足以生成高质量样本，但引入随机性可以提升样本多样性。这引出如下问题：
+\begin{question}
+是否存在一个 SDE，其动力学从 $p_{\mathrm{prior}}$ 出发，所产生的边缘密度与 \Cref{eq:ode-velocity} 中的 ODE 相同？
+\end{question}
+这一陈述断言存在一族逆向时间 SDE，它们诱导出与相应 PF-ODE 相同的边缘密度路径。
+这些 SDE 诱导出的密度对该路径满足相同的 Fokker–Planck 方程，因此它们的单时刻边缘与规定的插值 $\{p_t\}_{t\in[0,T]}$ 一致\footnote{为完整性起见，（此处并不需要的）一种前向 SDE 表示为
+\[
+\diff \rvx(t)=f(t) \rvx(t) \diff t+g(t) \diff \rvw(t),
+\]
+其中 $f(t)$ 和 $g(t)$ 通过 \Cref{eq:kernel-sde-equiv} 与 $(\alpha_t,\sigma_t)$ 相联系。}。
+
+
+% \proppp{Reverse-Time SDEs Generate the Same Marginals as Interpolations}{rev-sde-interpolant}{Let $\gamma(t) \geq 0$ be an arbitrary time-dependent coefficient. Consider the reverse-time SDE
+% \begin{align}\label{eq:general-reverse-sde}
+%     \diff \bar\rvx(t) = \left[ \rvv(\bar\rvx(t), t) - \tfrac{1}{2} \gamma^2(t) \rvs(\bar\rvx(t), t) \right] \diff \bar t + \gamma(t) \diff \bar{ \rvw}(t),
+% \end{align}
+% evolving backward from $\bar\rvx(T) \sim p_{\mathrm{prior}}$ down to $t = 0$. Then this process $\{\bar\rvx(t)\}_{t\in[0,T]}$ matches the prescribed marginals $\{p_t\}_{t \in [0,T]}$, induced by the ODE's density path. Here, $\rvs(\rvx, t) := \nabla_{\rvx} \log p_t(\rvx)$ is the score function, and it is related to the velocity field $\rvv(\rvx, t)$ by
+% \begin{align}\label{eq:score-velocity}
+% \begin{aligned}
+%         \rvv(\rvx, t) &= f(t)\rvx - \frac{1}{2}g^2(t)\rvs(\rvx, t), \\ \text{or }\quad  \rvs(\rvx, t) &= \frac{1}{\sigma_t}  \frac{\alpha_t \rvv(\rvx, t) - \alpha_t' \rvx}{\alpha_t' \sigma_t - \alpha_t \sigma_t'}.
+% \end{aligned}
+% \end{align}
+% }{The reverse-time Fokker–Planck equation corresponding to \Cref{eq:general-reverse-sde} is
+% \[
+% \partial_{\bar t} p
+% = -\nabla \cdot \Big( \big[\rvv - \tfrac{1}{2}\gamma^2 \rvs \big] p \Big)
+%   + \tfrac{1}{2}\gamma^2 \Delta p .
+% \]
+% Using the identity $\nabla \cdot (\rvs p) = \Delta p$ (since $\rvs = \nabla \log p$), the diffusion terms cancel, yielding
+% \[
+% \partial_{\bar t} p = -\nabla \cdot (\rvv p),
+% \]
+% which is precisely the probability–flow continuity equation; see Appendix~A.2 of \citet{ma2024sit}.
+% }
+
+\proppp{逆向时间 SDE 生成与插值相同的边缘分布}{rev-sde-interpolant}{
+设 $\gamma(t) \geq 0$ 为任意的时间相关系数。考虑
+逆向时间 SDE，它以原始时间变量 $t$ 写出，并从 $T$ 到 $0$ 反向积分，
+\begin{align}\label{eq:general-reverse-sde}
+    \diff \bar\rvx(t)
+    =
+    \Big[
+        \rvv^*(\bar\rvx(t), t)
+        - \tfrac{1}{2}\gamma^2(t)\rvs^*(\bar\rvx(t), t)
+    \Big]\diff t
+    + \gamma(t)\diff\bar{\rvw}(t),
+    \qquad t:T\to 0 .
+\end{align}
+终端条件为 $\bar\rvx(T)\sim p_T$。则这一过程
+$\{\bar\rvx(t)\}_{t\in[0,T]}$ 与 ODE 密度路径所诱导的
+规定边缘 $\{p_t\}_{t\in[0,T]}$ 相匹配。这里，
+$\rvs^*(\rvx,t):=\nabla_{\rvx}\log p_t(\rvx)$ 是分数函数，它与
+速度场 $\rvv^*(\rvx,t)$ 的关系为
+\begin{align}\label{eq:score-velocity}
+    \rvv^*(\rvx, t)
+    =
+    f(t)\rvx
+    -
+    \frac{1}{2}g^2(t)\rvs^*(\rvx,t),
+    \quad
+    \rvs^*(\rvx,t)
+    =
+    \frac{1}{\sigma_t}
+    \frac{\alpha_t\rvv^*(\rvx,t)-\alpha_t'\rvx}
+    {\alpha_t'\sigma_t-\alpha_t\sigma_t'} .
+\end{align}
+}{
+逆向时间 Fokker--Planck 方程以原始时间变量 $t$ 写出（而过程反向积分）为
+\[
+\partial_t p_t
+=
+-\nabla\cdot
+\Big(
+\big[
+\rvv^*
+-
+\tfrac{1}{2}\gamma^2\rvs^*
+\big]p_t
+\Big)
+-
+\tfrac{1}{2}\gamma^2\Delta p_t .
+\]
+利用恒等式 $\nabla\cdot(\rvs^*p_t)=\Delta p_t$（因为
+$\rvs^*=\nabla\log p_t$），二阶项相消，得到
+\[
+\partial_t p_t
+=
+-\nabla\cdot(\rvv^*p_t),
+\]
+即与 PF-ODE 相关联的一阶连续性方程。因此
+逆向时间 SDE 与 ODE 诱导出相同的边缘密度路径
+$\{p_t\}$。参见 \citet{ma2024sit} 附录 A.2--A.3。
+}
+
+
+超参数 $\gamma(t)$ 可以任意选取，独立于 $\alpha_t$ 和 $\sigma_t$，甚至在训练之后也可以，因为它不影响速度 $\rvv(\rvx, t)$ 或分数 $\rvs(\rvx, t)$。以下是一些例子：
+\begin{itemize}
+    \item 令 $\gamma(t) = 0$ 时，恢复出 \Cref{eq:ode-velocity} 中的 ODE。
+    \item 当 $\gamma(t) = g(t)$ 时，\Cref{eq:general-reverse-sde} 变为 \Cref{eq:sde_backward} 中的逆向时间 SDE，因为 oracle 速度 $\rvv(\rvx, t)$ 满足（见命题~\ref{equi-para}）：
+    \[
+    \rvv^*(\rvx, t) = f(t)\rvx - \tfrac{1}{2}g^2(t)\rvs^*(\rvx, t).
+    \]
+    \item $\gamma(t)$ 的其他选择也已被探索；例如，\citet{ma2024sit} 选取 $\gamma(t)$ 以最小化 $p_{\mathrm{data}}$ 与从 $t=T$ 求解 \Cref{eq:general-reverse-sde} 所得 $t=0$ 密度之间的 KL 间隙。
+\end{itemize}
+遵循 Score SDE，训练好的速度场 $\rvv_{\bm{\phi}^\times}(\rvx, t)$ 可通过 \Cref{eq:score-velocity} 转换为参数化的分数函数 $\rvs_{\bm{\phi}^\times}(\rvx, t)$。将其代入 \Cref{eq:general-reverse-sde} 便定义了一个\emph{经验逆向时间 SDE}，可通过从 $t=T$ 以 $\bar\rvx(T) \sim p_{\mathrm{prior}}$ 进行数值积分来采样。
+
+这一命题凸显了扩散模型一种非凡的灵活性：一旦\emph{边缘密度路径} $\{p_t\}_{t\in[0,T]}$ 固定，整整一族动力学都可以再现它，包括 PF-ODE 和逆向时间 SDE
+\[
+\diff\bar\rvx(t)
+=\big[\rvv^*(\bar\rvx,t)-\tfrac12\gamma^2(t)\rvs^*(\bar\rvx,t)\big]\diff\bar t
++\gamma(t)\diff\bar\rvw(t),\qquad \gamma(t)\ge0.
+\]
+所有这些动力学都满足相同的逆向时间 Fokker-Planck 方程，因而产生相同的边缘演化。函数 $\gamma(t)$ 连续地调节随机性水平而不影响单时刻分布，这揭示了基于流的确定性 ODE 与其随机 SDE 对应物之间的深刻联系，如 \Cref{fig:unified_framework} 所示。
+
+
+\newpage
+
+\section{结束语}\label{subsec:takeaway-dm-gaussianfm}
+% \jcr{
+% As we have seen, diffusion models arise from diverse origins, including variational, score based, and flow based viewpoints. Despite differences in forward noise schedules and parameterizations, these approaches are equivalent in spirit (\Cref{sec:equivalent-parametrizations}). They share a conditioning strategy that yields a tractable, gradient equivalent training objective (\Cref{sec:conditional-trick}), and they construct reverse transitions that respect the forward marginals governed by the Fokker-Planck equation (\Cref{sec:comparison-connection}).
+
+% A broader lesson emerges. Rather than directly learning a single latent to data map, modern diffusion methods learn the evolution of densities and realize generation by integrating the induced dynamics. Many contemporaneous formulations look different yet instantiate the same principle: learn a time dependent vector field that transports a simple prior to data. The synthesis in \Cref{fig:unified_framework} illustrates this unity.
+
+% Two questions follow for future work. To what extent does learned density evolution already capture the core of generative modeling? If limitations remain, what alternatives might transcend this paradigm? Differential equations provide a natural language for these models, but they need not be the final word. We close by marking this milestone and by inviting work that tests the boundaries of the framework.
+
+
+
+% }
+
+本章一直是我们理论探索的基石，将基于变分、基于分数和基于流的视角综合成一个单一、连贯的框架。我们已经表明，这三种看似截然不同的方法并非仅仅是并行的，而是深刻而根本地相互关联。
+
+我们的统一建立在两个核心洞见之上。首先，我们识别出所有框架共有的秘密武器：一种条件化技巧，它将难以处理的边缘训练目标转化为可处理的条件目标，从而实现稳定且高效的学习。其次，我们确立了 Fokker-Planck 方程是统辖概率密度演化的普适法则。三种视角各自以自己的方式构造出尊重这一基本动力学的生成过程。
+
+
+此外，我们证明了各种模型参数化（即噪声、干净数据、分数或速度预测）都是可以相互替换的。这揭示了预测目标的选择是一个实现和稳定性问题，而非根本性的建模差异。最终的结论是：现代扩散方法尽管起源多样，但都实例化了相同的核心原理——它们学习一个随时间变化的向量场，以将简单的先验传输到数据分布。
+
+
+凭借这一统一且有原则的基础被牢牢确立，我们现在具备了从基础理论转向扩散模型的实际应用与加速的条件。“生成等价于求解微分方程”这一核心洞见为控制与优化提供了强大的平台。本书后续部分将利用这一统一理解来应对关键的实际挑战：
+\begin{enumerate}
+    \item C 篇将聚焦于改进推理时的采样过程。我们将探讨如何引导生成轨迹以实现可控生成（\Cref{ch:guidance}），并研究高级数值求解器以显著加速缓慢的迭代采样过程（\Cref{ch:solvers}）。
+    \item D 篇随后将超越迭代求解器，直接学习快速的生成器。我们将考察能够仅用一步或少数几步即可产生高质量样本的方法，无论是通过从教师模型蒸馏（\Cref{ch:distillation}）还是从头训练（\Cref{ch:fast-scratch}）。
+\end{enumerate}
+
+在统一了扩散模型的\textit{是什么}与\textit{为什么}之后，我们现在将注意力转向激动人心且实用的\textit{怎么做}前沿。

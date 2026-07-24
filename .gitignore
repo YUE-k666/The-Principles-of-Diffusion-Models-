@@ -1,0 +1,21 @@
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.xdv
+*.nav
+*.snm
+*.vrb
+
+# Editor / OS files
+.DS_Store
+*.swp
+*~
