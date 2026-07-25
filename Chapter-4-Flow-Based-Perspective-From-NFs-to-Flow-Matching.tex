@@ -1019,36 +1019,35 @@ $p_0=\mathcal N(\bm 0,\rmI)$（与 $p_{\mathrm{data}}$ 无关）且 $p_1=p_{\mat
 = b_t'\rvx_1 + \tfrac{a_t'}{a_t}\big(\rvx_t-b_t\rvx_1\big)
 = a_t'\rvx_0 + b_t'\rvx_1.
 \]
-Thus the one-sided loss regresses to the \emph{conditional expectation} of the two-sided target given $\rvx_t$:
+因此，单侧损失回归到给定 $\rvx_t$ 时双侧目标的\emph{条件期望}：
 \[
 \mathbf v^*(\rvx,t)=\E \big[a_t'\rvx_0 + b_t'\rvx_1 | \rvx_t=\rvx\big],
 \]
-so the one-sided and two-sided CFM objectives share the same minimizer.
+所以单侧与双侧 CFM 目标具有相同的最小化子。
 
 
-\paragraph{Gaussian FM = Diffusion Model.}
-We use the FM convention where $t=0$ denotes the source/prior and $t=1$ denotes the target/data:
+\paragraph{高斯 FM = 扩散模型。}
+我们采用 FM 的约定，其中 $t=0$ 表示源/先验，$t=1$ 表示目标/数据：
 \[
 p_{\mathrm{src}}=p_{\mathrm{prior}},\qquad p_{\mathrm{tgt}}=p_{\mathrm{data}}.
 \]
-By contrast, diffusion models typically index time from data to noise (i.e., $t=0$ is data and $t=1$ is prior). 
-Here, we adopt the FM convention indexing in the main discussion. For comparison, however, the VE and VP entries in \Cref{tb:interpolant_instances} are summarized in their usual diffusion-time indexing, where $t=0$ corresponds to data and $t=1$ to prior/noise.
-If further $p_{\mathrm{src}}=\mathcal N(\bm 0,\rmI)$, then for fixed condition $\rvx_1\sim p_{\mathrm{data}}$, 
-the conditional path $p_t(\cdot |\rvx_1)$ is naturally chosen to be Gaussian, 
-while the target distribution $p_{\mathrm{tgt}}$ itself need not be Gaussian. Some literature usually refer to this setting as \emph{Gaussian FM}.
+相比之下，扩散模型通常将时间从数据到噪声进行索引（即 $t=0$ 为数据，$t=1$ 为先验）。
+在此，我们在主要讨论中采用 FM 的索引约定。然而为了便于比较，\Cref{tb:interpolant_instances} 中的 VE 和 VP 条目采用其惯常的扩散时间索引进行总结，其中 $t=0$ 对应于数据，$t=1$ 对应于先验/噪声。
+若进一步有 $p_{\mathrm{src}}=\mathcal N(\bm 0,\rmI)$，则对于固定条件 $\rvx_1\sim p_{\mathrm{data}}$，
+条件路径 $p_t(\cdot |\rvx_1)$ 自然地被选择为高斯分布，
+而目标分布 $p_{\mathrm{tgt}}$ 本身不必是高斯分布。一些文献通常将这一设定称为\emph{高斯 FM}。
 
 
 
-Choosing $a_t = 1-t$ and $b_t = t$ (equivalently, $\alpha_t = t$ and $\sigma_t = 1-t$ under the relabeling $a_t:=\sigma_t$, $b_t:=\alpha_t$ in diffusion model) recovers the familiar FM/RF schedule~\citep{lipman2022flow,liu2022rectified}.
+选择 $a_t = 1-t$ 与 $b_t = t$（等价地，在扩散模型中重新标记 $a_t:=\sigma_t$、$b_t:=\alpha_t$ 之下对应 $\alpha_t = t$ 与 $\sigma_t = 1-t$），即可恢复我们熟悉的 FM/RF 调度~\citep{lipman2022flow,liu2022rectified}。
 
 
 \begin{table}[th]
-\caption{Summary of different interpolants written as 
-  $\rvx_t = a_t \rvx_0 + b_t \rvx_1$, where 
-  $\rvx_0 \sim p_{\mathrm{src}}=p_{\mathrm{prior}}$ and 
-  $\rvx_1 \sim p_{\mathrm{tgt}}=p_{\mathrm{data}}$. 
-  The FM/RF and trigonometric columns use the FM convention ($t=0$ source, $t=1$ target). 
-  For comparison, the VE/VP columns retain their usual diffusion-time indexing ($t=0$ data, $t=1$ prior/noise), with coefficient names relabeled as $a_t:=\sigma_t$ and $b_t:=\alpha_t$.}
+\caption{不同插值元写为 $\rvx_t = a_t \rvx_0 + b_t \rvx_1$ 的总结，其中
+  $\rvx_0 \sim p_{\mathrm{src}}=p_{\mathrm{prior}}$，
+  $\rvx_1 \sim p_{\mathrm{tgt}}=p_{\mathrm{data}}$。
+  FM/RF 与三角列采用 FM 约定（$t=0$ 为源，$t=1$ 为目标）。
+  为便于比较，VE/VP 列保留其惯常的扩散时间索引（$t=0$ 为数据，$t=1$ 为先验/噪声），系数名称重新标记为 $a_t:=\sigma_t$ 与 $b_t:=\alpha_t$。}
   \small
   \centering
   \resizebox{\textwidth}{!}{
@@ -1084,64 +1083,64 @@ Choosing $a_t = 1-t$ and $b_t = t$ (equivalently, $\alpha_t = t$ and $\sigma_t =
 
 
 
-In the Gaussian FM setting, both the beam-like and spotlight-like conditional paths lead to training objectives that are  similar to the standard diffusion losses. As we will elaborate in \Cref{ch:all-equivalent}, Gaussian FM can in fact be equivalently interpreted as a diffusion model trained to predict the \emph{velocity}, under the linear schedule $a_t = 1-t$ and $b_t = t$. This perspective highlights that flow matching and diffusion are not fundamentally different, but rather two equivalent formulations that can be transformed into one another. The Gaussian FM objective is particularly appealing in practice: its loss function ($\E_{t,\rvx_t} \left[\norm{\rvv_\bphi(\rvx_t, t) - (\rvx_1 - \rvx_0)}_2^2\right]$) is simple, and it has been shown to achieve competitive performance at scale~\citep{esser2024scaling}. 
+在高斯 FM 设定下，束状与聚光状条件路径所导出的训练目标都与标准扩散损失相似。正如我们将在 \Cref{ch:all-equivalent} 中详细阐述的那样，高斯 FM 实际上可以等价地解释为在线性调度 $a_t = 1-t$ 与 $b_t = t$ 下训练去预测\emph{速度}的扩散模型。这一观点凸显了流匹配与扩散在本质上并无不同，而是两种可以相互转换的等价表述。高斯 FM 目标在实践中尤其具有吸引力：其损失函数（$\E_{t,\rvx_t} \left[\norm{\rvv_\bphi(\rvx_t, t) - (\rvx_1 - \rvx_0)}_2^2\right]$）简单，并且已被证明在大规模场景下能够取得具有竞争力的性能~\citep{esser2024scaling}。
 
 
 
 
-\subsection{Conditional Flow-First Construction of $\rvv_t(\cdot|\rvz)$ and $p_t(\cdot|\rvz)$}\label{subsec:prob-path-flow}
+\subsection{$\rvv_t(\cdot|\rvz)$ 与 $p_t(\cdot|\rvz)$ 的条件流优先构造}\label{subsec:prob-path-flow}
 
-We treat the general case where the endpoints $p_{\mathrm{src}}$ (at $t=0$) and $p_{\mathrm{tgt}}$ (at $t=1$) are arbitrary. 
-Our goal is to design, directly in trajectory space, a conditional flow that transports samples from $p_{\mathrm{src}}$ to $p_{\mathrm{tgt}}$ and yields a closed-form $\rvv_t(\rvx_t|\rvz)$ usable as a regression target.
+我们处理端点 $p_{\mathrm{src}}$（在 $t=0$）与 $p_{\mathrm{tgt}}$（在 $t=1$）任意的最一般情形。
+我们的目标是直接在轨迹空间中设计一个条件流，将样本从 $p_{\mathrm{src}}$ 输送到 $p_{\mathrm{tgt}}$，并给出可作回归目标的闭式 $\rvv_t(\rvx_t|\rvz)$。
 
-\paragraph{Motivation.}
-Instead of first designing conditional density path, we may directly specify a conditional flow map $\bPsi_{0\to t}(\cdot;\rvz)$ that moves samples along trajectories. This has two practical advantages: (i) it immediately yields a regression target for training via a time derivative along trajectories; (ii) on geometry-structured spaces (Riemannian manifolds, Lie groups, or constrained submanifolds), it is often natural to construct the conditional flow map 
-$\bPsi_{0\to t}$ directly from the geometry (e.g., geodesics, exponential maps, or premetrics)~\citep{lipman2024flow} which yields analytic, simulation-free target velocities for training.
+\paragraph{动机。}
+我们可以不必先设计条件密度路径，而是直接指定一个让样本沿轨迹移动的条件流映射 $\bPsi_{0\to t}(\cdot;\rvz)$。这有两个实际优势：(i) 它可以立即通过沿轨迹的时间导数给出训练所需的回归目标；(ii) 在具有几何结构的空间（黎曼流形、李群或约束子流形）上，直接从几何（例如测地线、指数映射或预度量）出发构造条件流映射
+$\bPsi_{0\to t}$ 往往十分自然~\citep{lipman2024flow}，由此可得到解析的、无需仿真的目标速度用于训练。
 
 
-\paragraph{Conditional Affine Flow (Link to Proposition~\ref{closed-form-vf}).}
-We fix a conditioning variable $\rvz\sim\pi$ (e.g., $\rvz=\rvx_1\sim p_{\mathrm{tgt}}$ in one-sided “spotlight’’ training) and push forward $\rvx_0\sim p_{\mathrm{src}}$ through the time-varying \emph{conditional affine flow} 
+\paragraph{条件仿射流（关联命题~\ref{closed-form-vf}）。}
+我们固定条件变量 $\rvz\sim\pi$（例如在单侧"聚光"训练中取 $\rvz=\rvx_1\sim p_{\mathrm{tgt}}$），并将 $\rvx_0\sim p_{\mathrm{src}}$ 通过时变\emph{条件仿射流}前推送
 \[
 \bPsi_{0\to t}(\rvx_0;\rvz) := \bm\mu_t(\rvz) + \rmA_t(\rvz) \rvx_0,\qquad t\in[0,1],
 \]
-where $\bm\mu_t(\rvz)\in\R^D$ and $\rmA_t(\rvz)\in\R^{D\times D}$ is invertible for $t\in(0,1)$. The boundary 
-$\rmA_0(\rvz)=\rmI,\ \bm\mu_0(\rvz)=\mathbf 0$ recovers $p_{\mathrm{src}}$ at $t=0$. It is standard to interpret boundary when $t\to1$ as a limit (the terminal map may concentrate mass on a lower-dimensional set or a point)\footnote{Allowing $\rmA_1(\rvz)$ to be singular (e.g., $\mathbf 0$) is compatible with invertibility on $(0,1)$ and causes the path to contract onto the prescribed endpoint at $t=1$.}. 
+其中 $\bm\mu_t(\rvz)\in\R^D$，$\rmA_t(\rvz)\in\R^{D\times D}$ 在 $t\in(0,1)$ 上可逆。边界
+$\rmA_0(\rvz)=\rmI,\ \bm\mu_0(\rvz)=\mathbf 0$ 在 $t=0$ 处恢复 $p_{\mathrm{src}}$。通常将 $t\to1$ 时的边界解释为极限（终端映射可能会将质量集中在低维集合或一个点上）\footnote{允许 $\rmA_1(\rvz)$ 退化（例如取 $\mathbf 0$）与在 $(0,1)$ 上的可逆性相容，并使路径在 $t=1$ 处收缩到指定的端点。}。
 
 
-\subparagraph{Induced Conditional Path $p_t(\cdot|\rvz)$.}
-The construction defines
+\subparagraph{诱导的条件路径 $p_t(\cdot|\rvz)$。}
+该构造定义了
 \[
 p_t(\cdot|\rvz) = \bigl(\bPsi_{0\to t}( \cdot ;\rvz)\bigr)_{\#} p_{\mathrm{src}},
 \qquad
 p_t(\cdot)  =  \int p_t(\cdot|\rvz)\pi(\rvz)\diff\rvz.
 \]
-What ultimately matters in $\mathcal{L}_{\mathrm{CFM}}$ is how to sample from it:  
-first draw $\rvz \sim \pi$, then draw $\rvx_0 \sim p_{\mathrm{src}}$, and finally set
+在 $\mathcal{L}_{\mathrm{CFM}}$ 中最终重要的是如何从中采样：
+首先抽取 $\rvz \sim \pi$，然后抽取 $\rvx_0 \sim p_{\mathrm{src}}$，最后令
 \[
 \rvx_t = \bm\mu_t(\rvz) + \rmA_t(\rvz)\rvx_0.
 \]
 
 
-We remark that when $\bPsi_{0\to t}$ is affine in $\rvx_0$, then $p_t( \cdot | \rvz)$ is Gaussian 
-if and only if $p_{\mathrm{src}}$ is Gaussian. 
-In particular, for arbitrary (non-Gaussian) $p_{\mathrm{src}}$, an affine flow yields a
-generally non-Gaussian $p_t(\cdot|\rvz)$.
+我们要指出，当 $\bPsi_{0\to t}$ 关于 $\rvx_0$ 是仿射时，$p_t( \cdot | \rvz)$ 为高斯分布
+当且仅当 $p_{\mathrm{src}}$ 为高斯分布。
+特别地，对于任意（非高斯）的 $p_{\mathrm{src}}$，仿射流给出一个
+通常非高斯的 $p_t(\cdot|\rvz)$。
 
 
-\subparagraph{Derived Conditional Velocity $\rvv_t(\cdot|\rvz)$.} The conditional velocity $\rvv_t(\cdot|\rvz)$ is obtained by $t$-differentiating the conditional flow map $\bPsi_{0\to t}$. Following the derivation in Proposition~\ref{closed-form-vf}, consider the \emph{conditional} ODE defined by the flow map $\bPsi_{0\to t}(\rvy;\rvz)$ with initial condition $\rvy$, where the goal is to identify the corresponding conditional velocity field $\rvv_t(\cdot|\rvz)$:
+\subparagraph{导出的条件速度 $\rvv_t(\cdot|\rvz)$。} 条件速度 $\rvv_t(\cdot|\rvz)$ 通过对条件流映射 $\bPsi_{0\to t}$ 求 $t$ 导数得到。遵循命题~\ref{closed-form-vf} 中的推导，考虑由流映射 $\bPsi_{0\to t}(\rvy;\rvz)$ 以初值 $\rvy$ 定义的\emph{条件}常微分方程 (ODE)，目标是确定对应的条件速度场 $\rvv_t(\cdot|\rvz)$：
 \[
 \frac{\diff}{\diff t} \bPsi_{0\to t}(\rvy;\rvz)
 = \rvv_t \Big(\underbrace{\bPsi_{0\to t}(\rvy;\rvz)}_{\rvx} \Big| \rvz\Big).
 \]
-Since $\bPsi_{0\to t}(\cdot;\rvz)$ is invertible for $t\in(0,1)$, we may express $\rvy$ in terms of the current state $\rvx:=\bPsi_{0\to t}(\rvy;\rvz)$ as $\rvy=\bPsi_{0\to t}^{-1}(\rvx;\rvz)=\bPsi_{t\to 0}(\rvx;\rvz)$. Substituting this into the ODE yields the following construction of the conditional velocity field:
+由于 $\bPsi_{0\to t}(\cdot;\rvz)$ 在 $t\in(0,1)$ 上可逆，我们可以将 $\rvy$ 用当前状态 $\rvx:=\bPsi_{0\to t}(\rvy;\rvz)$ 表示为 $\rvy=\bPsi_{0\to t}^{-1}(\rvx;\rvz)=\bPsi_{t\to 0}(\rvx;\rvz)$。将其代入 ODE，得到如下条件速度场的构造：
 \[
 \rvv_t(\rvx|\rvz)
 := \frac{\diff}{\diff t} \bPsi_{0\to t} \bigl(\bPsi_{t\to 0}(\rvx;\rvz);\rvz\bigr),
 \]
-which makes explicit that the derivative must be taken along the trajectory that reaches the spatial point $\rvx$ at time $t$.
+这明确表明，求导必须沿在时刻 $t$ 到达空间点 $\rvx$ 的那条轨迹进行。
 
 
-Since $\rvx_t=\bm\mu_t(\rvz)+\rmA_t(\rvz)\rvx_0$ and $\rmA_t(\rvz)$ is invertible on $(0,1)$, we have $\rvx_0=\rmA_t(\rvz)^{-1}\bigl(\rvx-\bm\mu_t(\rvz)\bigr)$, giving
+由于 $\rvx_t=\bm\mu_t(\rvz)+\rmA_t(\rvz)\rvx_0$ 且 $\rmA_t(\rvz)$ 在 $(0,1)$ 上可逆，我们有 $\rvx_0=\rmA_t(\rvz)^{-1}\bigl(\rvx-\bm\mu_t(\rvz)\bigr)$，从而
 \[
 \rvv_t(\rvx|\rvz)
  = 
@@ -1149,176 +1148,170 @@ Since $\rvx_t=\bm\mu_t(\rvz)+\rmA_t(\rvz)\rvx_0$ and $\rmA_t(\rvz)$ is invertibl
 \]
 
 
-\subparagraph{One-Sided Conditioning ($\rvz=\rvx_1$).}
-Choosing $\bm\mu_t(\rvz)=b_t \rvz$ and $\rmA_t(\rvz)=a_t \rmI$ with $a_0=1,a_1=0$ and $b_0=0,b_1=1$ (with $a_t>0$ for $t\in(0,1)$) yields
+\subparagraph{单侧条件化（$\rvz=\rvx_1$）。}
+选择 $\bm\mu_t(\rvz)=b_t \rvz$ 与 $\rmA_t(\rvz)=a_t \rmI$，满足 $a_0=1,a_1=0$ 与 $b_0=0,b_1=1$（且对 $t\in(0,1)$ 有 $a_t>0$），得到
 \[
 \rvx_t = a_t \rvx_0 + b_t \rvx_1,
 \qquad
 \rvv_t(\rvx|\rvx_1) = b_t' \rvx_1 + \frac{a_t'}{a_t} \bigl(\rvx-b_t\rvx_1\bigr).
 \]
-On paired samples $(\rvx_0,\rvx_1)$ (with $\rvx_t=a_t\rvx_0+b_t\rvx_1$), this simplifies to the usual CFM target:
+在成对样本 $(\rvx_0,\rvx_1)$ 上（其中 $\rvx_t=a_t\rvx_0+b_t\rvx_1$），它化简为常见的 CFM 目标：
 \[
 \rvv_t(\rvx_t|\rvx_1)=a_t' \rvx_0 + b_t' \rvx_1.
 \]
 
-\subparagraph{Two-Sided Conditioning ($\rvz=(\rvx_0,\rvx_1)$).}
-The same template with $\bm\mu_t(\rvx_0,\rvx_1)=b_t \rvx_1$ and $\rmA_t(\rvx_0,\rvx_1)=a_t \rmI$ makes the conditional path \emph{deterministic}:
+\subparagraph{双侧条件化（$\rvz=(\rvx_0,\rvx_1)$）。}
+同一模板取 $\bm\mu_t(\rvx_0,\rvx_1)=b_t \rvx_1$ 与 $\rmA_t(\rvx_0,\rvx_1)=a_t \rmI$，使条件路径\emph{确定化}：
 \[
 \rvx_t=a_t \rvx_0+b_t \rvx_1,
 \qquad
 p_t(\cdot|\rvx_0,\rvx_1)=\delta\left(\cdot - (a_t\rvx_0+b_t\rvx_1)\right),
 \]
-and the conditional velocity is
+且条件速度为
 \[
 \rvv_t(\rvx_t|\rvx_0,\rvx_1)=a_t' \rvx_0+b_t' \rvx_1,
 \]
-i.e., the standard two-sided CFM target. 
+即标准的双侧 CFM 目标。
 
-\subparagraph{Unconditional Gaussian Path as a Special Case.}
-If $\bm{\mu}_t$ is independent of $\rvz$ (denoted $\bm{\mu}(t)$) and 
-$\rmA_t = \tfrac{\sigma(t)}{\sigma(0)} \rmI$, then
+\subparagraph{作为特例的无条件高斯路径。}
+若 $\bm{\mu}_t$ 与 $\rvz$ 无关（记为 $\bm{\mu}(t)$）且
+$\rmA_t = \tfrac{\sigma(t)}{\sigma(0)} \rmI$，则
 \[
 \bPsi_{0\to t}(\rvx_0)=\bm\mu(t)+\sigma(t) \frac{\rvx_0-\bm\mu(0)}{\sigma(0)},
 \quad
 \rvv_t(\rvx)=\bm\mu'(t)+\frac{\sigma'(t)}{\sigma(t)}\bigl(\rvx-\bm\mu(t)\bigr),
 \]
-which recovers the Gaussian density path and the closed-form velocity in Proposition~\ref{closed-form-vf}.
+这就恢复了命题~\ref{closed-form-vf} 中的高斯密度路径与闭式速度。
 
 
 
 
 
-\subsection{Probability-Path-First vs. Flow-First Construction}
 
-Both constructions aim to connect a source distribution $p_{\mathrm{src}}$ and a target distribution $p_{\mathrm{tgt}}$ through conditional dynamics. 
-The \emph{probability-path-first} (Eulerian) view begins by positing a conditional density path $p_t(\cdot|\rvz)$, often chosen from Gaussian or affine families so that the associated velocity $\rvv_t(\cdot|\rvz)$ can be solved analytically. 
-The \emph{flow-first} (Lagrangian) view instead specifies a conditional flow map $\bPsi_{0\to t}(\cdot|\rvz)$ and obtains the velocity directly by differentiation along particle trajectories. 
-While both yield equivalent transport under regularity, they differ in identifiability, ease of computation, and how endpoint constraints are enforced. 
-The following table summarizes these contrasts. The takeaway: path-first is natural when conditional paths admit closed-form velocities; flow-first is natural when you have strong structural priors on trajectories.
+\subsection{概率路径优先构造 vs. 流优先构造}
+
+两种构造都旨在通过条件动力学把源分布 $p_{\mathrm{src}}$ 与目标分布 $p_{\mathrm{tgt}}$ 连接起来。
+\emph{概率路径优先}（欧拉）观点先假设一条条件密度路径 $p_t(\cdot|\rvz)$，通常选自高斯族或仿射族，以使相应的速度 $\rvv_t(\cdot|\rvz)$ 可以解析地求解。
+\emph{流优先}（拉格朗日）观点则相反，它指定一个条件流映射 $\bPsi_{0\to t}(\cdot|\rvz)$，并通过对粒子轨迹求导直接得到速度。
+在正则性条件下两者给出等价的输运，但它们在可识别性、计算便利性以及端点约束的施加方式上有所不同。
+下表总结了这些对比。要点是：当条件路径容许闭式速度时，路径优先自然；当对轨迹有强结构先验时，流优先自然。
 
 \newpage
-\begin{center} \begingroup \scriptsize \setlength{\tabcolsep}{4pt} \renewcommand{\arraystretch}{1.05} \begin{tabular}{p{0.13\linewidth} p{0.41\linewidth} p{0.41\linewidth}} \toprule \textbfs{Axis} & \textbfs{Conditional Probability-Path-First} & \textbfs{Conditional Flow-First} \\\midrule \textbfs{Given} & Conditional density path $p_t(\cdot|\rvz)$. & Conditional flow map $\bPsi_{0\to t}(\cdot|\rvz)$ (trajectories, for each fixed $\rvz$). \\ \graymidrule \textbfs{Get Velocity} & For each $\rvz$, find $\rvv_t(\cdot|\rvz)$ s.t.\ $$\partial_t p_t(\cdot|\rvz)+\nabla \cdot \left(p_t(\cdot|\rvz) \rvv_t(\cdot|\rvz)\right)=0;$$ Non-unique: if $\nabla\!\cdot~\left(p_t \mathbf w_t\right)=0$ then $\rvv_t+\mathbf w_t$ yields the same $p_t$. & Along paths (for each $\rvz$): $$ \rvv_t \left(\bPsi_{0\to t}(\cdot|\rvz) | \rvz\right)=\tfrac{\diff}{\diff t}\bPsi_{0\to t}(\cdot|\rvz).$$ 
-When $\bPsi_{0\to t}$ is invertible, one can solve
+\begin{center} \begingroup \scriptsize \setlength{\tabcolsep}{4pt} \renewcommand{\arraystretch}{1.05} \begin{tabular}{p{0.13\linewidth} p{0.41\linewidth} p{0.41\linewidth}} \toprule \textbfs{维度} & \textbfs{条件概率路径优先} & \textbfs{条件流优先} \\\midrule \textbfs{给定} & 条件密度路径 $p_t(\cdot|\rvz)$。 & 条件流映射 $\bPsi_{0\to t}(\cdot|\rvz)$（对每个固定的 $\rvz$ 的轨迹）。 \\ \graymidrule \textbfs{求速度} & 对每个 $\rvz$，求 $\rvv_t(\cdot|\rvz)$ 使得 $$\partial_t p_t(\cdot|\rvz)+\nabla \cdot \left(p_t(\cdot|\rvz) \rvv_t(\cdot|\rvz)\right)=0;$$ 不唯一：若 $\nabla\!\cdot~\left(p_t \mathbf w_t\right)=0$，则 $\rvv_t+\mathbf w_t$ 给出相同的 $p_t$。 & 沿路径（对每个 $\rvz$）：$$ \rvv_t \left(\bPsi_{0\to t}(\cdot|\rvz) | \rvz\right)=\tfrac{\diff}{\diff t}\bPsi_{0\to t}(\cdot|\rvz)。$$
+当 $\bPsi_{0\to t}$ 可逆时，可解得
 $$\rvv_t(\rvx|\rvz) = \tfrac{\diff}{\diff t}\bPsi_{0\to t}(\bPsi_{0\to t}^{-1}(\rvx)|\rvz). $$
-\\ \graymidrule \textbfs{Closed Form \newline of  $\rvv_t(\cdot|\rvz)$} & Convenient when $p_t(\cdot|\rvz)$ is Gaussian / exponential-family; otherwise obtaining $\rvv_t(\cdot|\rvz)$ is nontrivial. & Convenient when $\bPsi_{0\to t}(\cdot|\rvz)$ has structure (affine/low-rank); avoids density evaluation. \\ \graymidrule \textbfs{Uniqueness \newline of  $\rvv_t(\cdot|\rvz)$} & For each $\rvz$, $\rvv_t(\cdot|\rvz)$ is underdetermined unless a selection rule (e.g., potential flow / min.\ kinetic energy) is imposed. & Given $\bPsi_{0\to t}(\cdot|\rvz)$, both $p_t(\cdot|\rvz)=(\bPsi_{0\to t}(\cdot|\rvz))_\#p_0$ and $\rvv_t(\cdot|\rvz)$ are determined; non-invertible maps still define $\rvv_t(\cdot|\rvz)$ along trajectories, while invertible ones make it unique.
- \\ \graymidrule \textbfs{Realizability} & Must verify the constructed $\rvv_t(\cdot|\rvz)$ solving the continuity equation on the intended support. & Holds by construction: $$p_t(\cdot|\rvz)=\left(\bPsi_{0\to t}(\cdot|\rvz)\right)_\# p_0(\cdot|\rvz).$$ \\ \graymidrule \textbfs{Match \newline $(p_{\mathrm{src}},p_{\mathrm{tgt}})$} & Mix conditionals: \newline \hspace{3cm}$ p_{\mathrm{src}} = \int p_0(\cdot|\rvz) \pi(\rvz)\diff\rvz,$ \newline $p_{\mathrm{tgt}} = \int p_1(\cdot|\rvz) \pi(\rvz)\diff\rvz.$ \newline Under Gaussian--affine conditional paths with $\rvz$-independent coefficients, 
-$p_{\mathrm{src}}$ can be forced to be Gaussian. 
-For a general fixed endpoint $p_{\mathrm{src}}$ (possibly non-Gaussian), 
-the choice of $p_t(\cdot|\rvz)$ does not generally pin $p_{\mathrm{src}}$.
- & Set $\bPsi_{0\to 0}=\mathrm{Id}$ and choose boundary condition  to hit any $p_{\mathrm{tgt}}$. \\ \graymidrule \textbfs{Preferred \newline Scenarios} & Diffusion-style constructions; analytic targets via conditional Gaussians $p_t(\cdot|\rvz)$. & Strong structural priors via maps $\bPsi_{0\to t}(\cdot|\rvz)$; easy boundary control; accommodates singular/low-dimensional endpoints; natural for
-map-based regularization/transport
-costs. \\ \bottomrule \end{tabular} \endgroup \end{center}
+\\ \graymidrule \textbfs{$\rvv_t(\cdot|\rvz)$ 的 \newline 闭式} & 当 $p_t(\cdot|\rvz)$ 为高斯/指数族时便利；否则求得 $\rvv_t(\cdot|\rvz)$ 并非平凡。 & 当 $\bPsi_{0\to t}(\cdot|\rvz)$ 具有结构（仿射/低秩）时便利；避免密度求值。 \\ \graymidrule \textbfs{$\rvv_t(\cdot|\rvz)$ 的 \newline 唯一性} & 对每个 $\rvz$，$\rvv_t(\cdot|\rvz)$ 是欠定的，除非施加某种选择规则（例如势流/最小动能）。 & 给定 $\bPsi_{0\to t}(\cdot|\rvz)$，$p_t(\cdot|\rvz)=(\bPsi_{0\to t}(\cdot|\rvz))_\#p_0$ 与 $\rvv_t(\cdot|\rvz)$ 都被确定；不可逆映射仍可沿轨迹定义 $\rvv_t(\cdot|\rvz)$，而可逆映射则使其唯一。
+ \\ \graymidrule \textbfs{可实现性} & 必须验证所构造的 $\rvv_t(\cdot|\rvz)$ 在预期的支撑集上求解连续性方程。 & 由构造成立：$$p_t(\cdot|\rvz)=\left(\bPsi_{0\to t}(\cdot|\rvz)\right)_\# p_0(\cdot|\rvz).$$ \\ \graymidrule \textbfs{匹配 \newline $(p_{\mathrm{src}},p_{\mathrm{tgt}})$} & 混合条件： \newline \hspace{3cm}$ p_{\mathrm{src}} = \int p_0(\cdot|\rvz) \pi(\rvz)\diff\rvz,$ \newline $p_{\mathrm{tgt}} = \int p_1(\cdot|\rvz) \pi(\rvz)\diff\rvz.$ \newline 在系数与 $\rvz$ 无关的高斯--仿射条件路径下，
+$p_{\mathrm{src}}$ 可被强制为高斯。
+对于一般的固定端点 $p_{\mathrm{src}}$（可能非高斯），
+$p_t(\cdot|\rvz)$ 的选择通常不能唯一确定 $p_{\mathrm{src}}$。
+ & 令 $\bPsi_{0\to 0}=\mathrm{Id}$ 并选择边界条件以命中任意 $p_{\mathrm{tgt}}$。 \\ \graymidrule \textbfs{适用 \newline 场景} & 扩散式构造；通过条件高斯 $p_t(\cdot|\rvz)$ 获得解析目标。 & 通过映射 $\bPsi_{0\to t}(\cdot|\rvz)$ 提供强结构先验；易于边界控制；容纳奇异/低维端点；天然适合
+基于映射的正则化/输运
+代价。 \\ \bottomrule \end{tabular} \endgroup \end{center}
 
 
 
 
 
 %%%%%%%%%%%%%%%%%
-\subsection{On the Misinterpreted ``Straightness'' of the Canonical Affine Path}
+\subsection{论典范仿射路径被误解的"直性"}
 
-It is worth emphasizing that some prior
-works~\citep{liu2022rectified,lipman2022flow} suggest that adopting the
-canonical affine flow, $a_t = 1-t$ and $b_t = t$, yields
-``straight-line'' ODE trajectories enabling faster sampling. However,
-this claim does not hold in general.
+值得强调的是，一些先前的工作~\citep{liu2022rectified,lipman2022flow} 暗示，采用
+典范仿射流 $a_t = 1-t$ 与 $b_t = t$ 会得到
+"直线型" ODE 轨迹，从而加速采样。然而，
+这一论断在一般情况下并不成立。
 
-The key point is that one must distinguish two different notions of
-straightness. Under the canonical affine interpolation
+关键在于必须区分两种不同的直性概念。在典范仿射插值
 \[
 \rvx_t = (1-t)\rvx_0 + t\rvx_1,
 \]
-each \emph{conditional} path is indeed a straight-line interpolation in
-time once a particular pair $(\rvx_0,\rvx_1)$ is fixed. 
+之下，一旦固定某一特定对 $(\rvx_0,\rvx_1)$，
+每条\emph{条件}路径确实在时间上是一条直线插值。
 
-However, the actual sampling dynamics are governed not by a single fixed
-pair $(\rvx_0,\rvx_1)$, but by the \emph{marginal} velocity field
+然而，实际的采样动力学并不由单一固定的
+对 $(\rvx_0,\rvx_1)$ 所支配，而是由\emph{边缘}速度场
 \[
 \rvv^*(\rvx,t) = \E[\rvx_1 - \rvx_0| \rvx_t = \rvx].
 \]
-This is a conditional average over all pairs $(\rvx_0,\rvx_1)$ that
-could have produced the same intermediate point $(\rvx,t)$. As $t$
-changes, this conditional distribution changes, and so the averaged
-velocity generally changes as well. Consequently, the marginal ODE
-trajectory
+所支配。它是对所有可能产生同一中间点 $(\rvx,t)$ 的
+对 $(\rvx_0,\rvx_1)$ 所取的条件平均。随着 $t$
+变化，这一条件分布也在变化，因此平均后的
+速度通常也会变化。结果是，边缘 ODE
+轨迹
 \[
 \frac{\diff \rvz_t}{\diff t} = \rvv^*(\rvz_t, t) 
 \]
-need not be a straight-line interpolation in time, even though every
-underlying conditional path is straight. Therefore, while the scheduler $(a_t,b_t)=(1-t,t)$ can still be useful
-in practice, any empirical gain should not be attributed solely to a
-supposed ``straightness'' of the resulting ODE trajectories. In
-particular, since the marginal ODE trajectories are not generally
-straight, this choice alone does not imply that one can use fewer solver
-steps while still sampling the ODE accurately.
+即便每条底层的条件路径都是直线，它本身也
+不必是时间上的直线插值。因此，尽管调度器 $(a_t,b_t)=(1-t,t)$ 在实践中仍然可能有用，
+任何经验上的增益都不应仅仅归因于所得 ODE 轨迹所谓的"直性"。特别地，由于
+边缘 ODE 轨迹一般并不是直线，仅凭这一选择并不能推出
+人们可以在仍精确求解 ODE 的同时使用更少的求解步数。
 
-We now illustrate this point with a simple closed-form counterexample.
+我们现在用一个简单的闭式反例来说明这一点。
 
-\exm{A Simple 1D Counterexample}{
-Consider the one-dimensional setting with
+\exm{一个简单的一维反例}{
+考虑一维情形，取
 \[
 x_0 \sim \mathcal{N}(0, \sigma_0^2),
 \qquad
 x_1 \sim \mathcal{N}(0, \sigma_1^2),
 \]
-independent coupling, and the canonical affine interpolation
-$x_t = (1-t)x_0 + tx_1$.
-Each conditional path $(1-t)x_0 + tx_1$ is a straight line in
-time. We now compute the induced marginal velocity field.
+采用独立耦合以及典范仿射插值
+$x_t = (1-t)x_0 + tx_1$。
+每条条件路径 $(1-t)x_0 + tx_1$ 在时间上都是直线。我们现在计算诱导的边缘速度场。
 
-Since $(x_1 - x_0,\, x_t)$ is jointly Gaussian, the
-conditional expectation is linear in $x$, so
+由于 $(x_1 - x_0,\, x_t)$ 联合高斯，条件期望关于 $x$ 是线性的，故
 \[
 v^*(x,t)
 = \E[x_1 - x_0| x_t = x]
 = \frac{\operatorname{Cov}(x_1 - x_0,\, x_t)}
        {\operatorname{Var}(x_t)}\, x.
 \]
-A direct calculation gives
+直接计算给出
 \[
 \operatorname{Var}(x_t)
 = (1-t)^2\sigma_0^2 + t^2\sigma_1^2
 =: V(t),
 \]
-and
+以及
 \[
 \operatorname{Cov}(x_1 - x_0,\, x_t)
 = t\sigma_1^2 - (1-t)\sigma_0^2
 = \tfrac{1}{2} V'(t).
 \]
-Hence
+因此
 \[
 v^*(x,t) = \frac{V'(t)}{2V(t)}\, x.
 \]
 
-The marginal ODE
+边缘 ODE
 \[
 \frac{\diff z_t}{\diff t} = v^*(z_t, t)
 \]
-therefore has the exact solution
+于是有精确解
 \[
 z_t
 = z_0 \sqrt{\frac{V(t)}{V(0)}}
 = z_0 \sqrt{(1-t)^2 + \frac{\sigma_1^2}{\sigma_0^2}\, t^2}.
 \]
 
-Now, a straight-line interpolation in time would require $z_t$ to be
-affine in $t$, namely $z_t = (1-t)z_0 + t\,z_1$ for some endpoint
-$z_1$. But
+如今，时间上的直线插值要求 $z_t$ 关于 $t$ 是仿射的，即对某个端点
+$z_1$ 有 $z_t = (1-t)z_0 + t\,z_1$。但是
 \[
 \sqrt{(1-t)^2 + \frac{\sigma_1^2}{\sigma_0^2}\, t^2}
 \]
-is not affine in $t$ for any positive $\sigma_0, \sigma_1$. Thus the ODE
-trajectory is generally not a straight-line interpolation in time. We illustrate this phenomenon in \Cref{fig:straightness-counterexample}
-with the example $\sigma_0=2$ and $\sigma_1=3$.
+对任何正的 $\sigma_0, \sigma_1$ 都不是关于 $t$ 的仿射函数。因此 ODE
+轨迹一般并非时间上的直线插值。我们在 \Cref{fig:straightness-counterexample} 中以
+$\sigma_0=2$ 与 $\sigma_1=3$ 为例说明这一现象。
 
-For example, when $\sigma_0 = \sigma_1$, we have $z_1 = z_0$, so a
-straight-line interpolation would simply be the constant path
-$z_t = z_0$. In contrast, the actual ODE trajectory satisfies
+例如，当 $\sigma_0 = \sigma_1$ 时，有 $z_1 = z_0$，所以
+直线插值只不过就是常数路径
+$z_t = z_0$。相比之下，实际的 ODE 轨迹满足
 \[
 z_{1/2} = \frac{z_0}{\sqrt{2}} \neq z_0.
 \]
-Therefore, even though every conditional interpolation path is straight,
-the induced marginal ODE trajectory need not be.
+因此，即使每条条件插值路径都是直线，
+诱导的边缘 ODE 轨迹也未必如此。
 }
 %%%%%%%%%%%%%
 
@@ -1326,232 +1319,226 @@ the induced marginal ODE trajectory need not be.
         \label{fig:straightness-counterexample}
     \centering
     \includegraphics[width=\linewidth]{Images/PartB/straightness_counterexample.pdf}
-    \caption{\textbfs{Marginal ODE trajectories are not straight under the canonical affine interpolation.}
-    We take $x_0 \sim \mathcal{N}(0, \sigma_0^2)$ and $x_1 \sim \mathcal{N}(0, \sigma_1^2)$ with $\sigma_0=2$, $\sigma_1=3$, and independent coupling.
-    Gray lines show sampled conditional paths $(1-t)x_0 + tx_1$, which are straight by construction.
-    Solid curves show the exact marginal ODE trajectories $z_t = z_0\sqrt{(1-t)^2 + (\sigma_1/\sigma_0)^2 t^2}$, and dashed lines show the corresponding straight-line interpolations from $z_0$ to $z_1$.
-    The visible gap between solid and dashed curves confirms that the marginal ODE trajectories are not affine in $t$, even though every conditional path is a straight line.
-    The marginal densities $p_{\mathrm{src}}$ and $p_{\mathrm{tgt}}$ are shown on the left and right margins, respectively.
-    \figcredit{Created by the authors with AI-assisted coding.}}
+    \caption{\textbfs{在典范仿射插值下，边缘 ODE 轨迹并不是直线。}
+    我们取 $x_0 \sim \mathcal{N}(0, \sigma_0^2)$ 与 $x_1 \sim \mathcal{N}(0, \sigma_1^2)$，其中 $\sigma_0=2$、$\sigma_1=3$，并采用独立耦合。
+    灰色线条展示的是采样的条件路径 $(1-t)x_0 + tx_1$，它们按构造即为直线。
+    实曲线展示的是精确的边缘 ODE 轨迹 $z_t = z_0\sqrt{(1-t)^2 + (\sigma_1/\sigma_0)^2 t^2}$，虚线展示的是从 $z_0$ 到 $z_1$ 对应的直线插值。
+    实曲线与虚线之间可见的间隙证实：即便每条条件路径都是直线，边缘 ODE 轨迹也不是关于 $t$ 的仿射函数。
+    边缘密度 $p_{\mathrm{src}}$ 与 $p_{\mathrm{tgt}}$ 分别显示在左侧和右侧的边距上。
+    \figcredit{由作者在 AI 辅助编程下绘制。}}
 \end{figure}
      
-
-
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \clearpage
 \newpage
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-S\section{\texorpdfstring{(Optional) Properties of the Canonical Affine Flow}{(Optional) Properties of the Canonical Affine Flow}}\label{sec:optimal-canonical}
+S\section{\texorpdfstring{（可选）典范仿射流的性质}{(Optional) Properties of the Canonical Affine Flow}}\label{sec:optimal-canonical}
 
-Given two endpoint distributions $p_0=p_{\mathrm{src}}$ and $p_1=p_{\mathrm{tgt}}$, 
-a natural and widely used choice for defining the conditional path in flow matching (FM)~\citep{lipman2022flow} 
-and rectified flow (RF)~\citep{liu2022flow} is the linear interpolation
+给定两个端点分布 $p_0=p_{\mathrm{src}}$ 与 $p_1=p_{\mathrm{tgt}}$，
+在流匹配 (FM)~\citep{lipman2022flow}
+与整流流 (RF)~\citep{liu2022flow} 中定义条件路径的一种自然且被广泛使用的选择是线性插值
 \[
 a_t = 1 - t, \qquad b_t = t,
 \]
-which yields the interpolant
+它给出插值元
 \[
 \mathbf{x}_t = (1 - t)\mathbf{x}_0 + t \mathbf{x}_1, 
 \qquad \mathbf{x}_0 \sim p_{\mathrm{src}},\ \mathbf{x}_1 \sim p_{\mathrm{tgt}}.
 \]
-Under this choice, the training objective simplifies to
+在此选择下，训练目标化简为
 \[
 \mathbb{E}_{t \sim \mathcal{U}[0,1]}   
 \mathbb{E}_{\mathbf{x}_0, \mathbf{x}_1} 
 \left[ \bigl\|\mathbf{v}_{\bm{\phi}}(\mathbf{x}_t, t) - (\mathbf{x}_1 - \mathbf{x}_0)\bigr\|_2^2 \right].
 \]
 
-This linear flow enjoys several appealing properties. 
-In particular, it admits an iterative refinement scheme, known as \emph{\texttt{Reflow}}, 
-which progressively straightens the path between distributions while preserving the marginals. 
+这一线性流具有若干良好性质。
+特别地，它容许一种迭代精修方案，称为 \emph{\texttt{Reflow}}，
+该方案在保持边缘分布的同时，逐步把分布之间的路径拉直。
 
 
 
 
+\subsection{整流流：从含噪猜测到结构化配对}\label{subsec:rectify}
 
-\subsection{Rectifying Flows: From Noisy Guesses to Structured Pairings}\label{subsec:rectify}
+\paragraph{经由自洽路径从噪声到数据。}
+考虑生成任务，其中 $p_{\text{src}}$ 是先验，$p_{\text{tgt}}$ 是真实数据。我们想要一条将噪声输运到数据的连续路径。一种朴素策略是独立地采样 $\rvz_0 \sim p_{\text{src}}$ 与 $\rvx_1 \sim p_{\text{tgt}}$，做插值（例如 $\rvx_t=(1-t)\rvx_0+t\rvx_1$），然后对这条直线拟合一个速度场。这会产生\emph{不相干配对}：端点在各次迭代之间互不相关，于是轨迹波动、方差爆炸、收敛变慢、样本质量受损。
 
-\paragraph{From Noise to Data via Coherent Paths.}
-Take the generation task where $p_{\text{src}}$ is the prior and $p_{\text{tgt}}$ is the real data. We want a continuous path that transports noise to data. A naive tactic samples $\rvz_0 \sim p_{\text{src}}$ and $\rvx_1 \sim p_{\text{tgt}}$ independently, interpolates (e.g.\ $\rvx_t=(1-t)\rvx_0+t\rvx_1$), and fits a velocity field to that line. This creates \emph{incoherent pairings}: endpoints are unrelated across iterations, so trajectories fluctuate, variance explodes, convergence slows, and sample quality suffers.
-
-\paragraph{Why Independent Couplings Fall Short.}
-Conditional flow matching with independent draws uses
+\paragraph{为何独立耦合不尽如人意。}
+采用独立抽样的条件流匹配使用
 \[
 \pi(\rvz)=p_{\text{src}}(\rvx_0) p_{\text{tgt}}(\rvx_1),
 \]
-or one-sided variants. Such couplings are sampling-friendly but induce jagged, high-variance paths that a velocity field struggles to model.
+或其单侧变体。这样的耦合便于采样，但会诱导出锯齿状、高方差的路径，使速度场难以建模。
 
-\paragraph{Rectify the Flow via Dependent Coupling.}
-Rather than relying on arbitrary pairings, we use a pre-trained diffusion model $\rvv_{\bphi^\times}(\cdot,t)$ as the drift in a PF-ODE to \emph{deterministically} transport each source point. Starting from $\rvz(0)=\rvz_0 \sim p_{\text{src}}$, we integrate
+\paragraph{通过相依耦合整流流。}
+我们不再依赖任意配对，而是把预训练扩散模型 $\rvv_{\bphi^\times}(\cdot,t)$ 用作 PF-ODE 的漂移项，以\emph{确定性地}输运每个源点。从 $\rvz(0)=\rvz_0 \sim p_{\text{src}}$ 出发，积分
 \[
 \frac{\diff \rvz(t)}{\diff t} = \rvv_{\bphi^\times}(\rvz(t),t), \qquad t \in [0,1],
 \]
-to obtain $\hat\rvz_1 := \rvz(1)$ positioned near the data space learned from the pre-trained model. The resulting pair $(\rvz_0,\hat\rvz_1)$ forms a \emph{dependent coupling}: it follows a structured, model-guided path rather than an arbitrary interpolation. This idea extends naturally to affine reference paths of the form $\rvx_t = a_t \rvx_0 + b_t \rvx_1$, where $\rvx_0 \sim p_{\text{src}}$ and $\rvx_1 \sim p_{\text{tgt}}$.
+得到 $\hat\rvz_1 := \rvz(1)$，它位于预训练模型所学到的数据空间附近。所得的对 $(\rvz_0,\hat\rvz_1)$ 构成一种\emph{相依耦合}：它沿着一条结构化的、模型引导的路径，而非任意插值。这一想法自然地推广到形如 $\rvx_t = a_t \rvx_0 + b_t \rvx_1$ 的仿射参考路径，其中 $\rvx_0 \sim p_{\text{src}}$、$\rvx_1 \sim p_{\text{tgt}}$。
 
 
 
 \begin{algorithm}[H]
-\caption{\texttt{Rectify} Operation\label{alg:Rectify}}
+\caption{\texttt{Rectify} 操作\label{alg:Rectify}}
 \begin{algorithmic}[1]
-\Require Reference path $\{\rvx_t\}_{t\in[0,1]}$ (e.g.\ $\rvx_t=a_t\rvx_0+b_t\rvx_1$)
-\State \textbfs{Pre-Train Diffusion.} Fit $\rvv_{\bphi^\times}$ on the chosen path by minimizing
+\Require 参考路径 $\{\rvx_t\}_{t\in[0,1]}$（例如 $\rvx_t=a_t\rvx_0+b_t\rvx_1$）
+\State \textbfs{预训练扩散。} 在所选路径上通过最小化如下目标拟合 $\rvv_{\bphi^\times}$
 \[
 \bphi^\times \in \arg\min_{\bphi} 
 \mathbb{E}_{t,\rvx_0,\rvx_1} \left[\Big\|\rvv_{\bphi}(\rvx_t,t)-\frac{\diff \rvx_t}{\diff t}\Big\|_2^2\right].
 \]
-\State \textbfs{Rectify.} Sample $\rvz_0 \sim p_{\text{src}}$ and integrate
+\State \textbfs{整流。} 采样 $\rvz_0 \sim p_{\text{src}}$ 并积分
 \[
 \frac{\diff \rvz(t)}{\diff t}=\rvv_{\bphi^\times}(\rvz(t),t),\qquad \rvz(0)=\rvz_0,\quad t\in[0,1],
 \]
-to obtain $\hat\rvz_1=\rvz(1)$ and the trajectory $\{\rvz(t)\}_{t\in[0,1]}$.
-\Ensure Dependent (coherent) pair $(\rvz_0,\hat\rvz_1)$ or the full trajectory.
+得到 $\hat\rvz_1=\rvz(1)$ 及轨迹 $\{\rvz(t)\}_{t\in[0,1]}$。
+\Ensure 相依（相干）对 $(\rvz_0,\hat\rvz_1)$ 或完整轨迹。
 \end{algorithmic}
 \end{algorithm}
 
-\paragraph{Why It Works: Marginal-Preserving Structure.}
-Let $\bPhi_{0\to t}$ denote the flow map generated by the above ODE defined by the pre-trained diffusion $\rvv_{\bphi^\times}$; then $\rvz(t)=\bPhi_{0\to t}(\rvz_0)$ and $\hat\rvz_1=\bPhi_{0\to 1}(\rvz_0)$. The \texttt{Rectify} procedure pairs each source point with its flow endpoint, giving the deterministic joint
+\paragraph{为何有效：保边缘的结构。}
+记由上述预训练扩散 $\rvv_{\bphi^\times}$ 定义的 ODE 所生成的流映射为 $\bPhi_{0\to t}$；则 $\rvz(t)=\bPhi_{0\to t}(\rvz_0)$ 且 $\hat\rvz_1=\bPhi_{0\to 1}(\rvz_0)$。\texttt{Rectify} 过程把每个源点与其流映射的终点配对，给出确定性的联合分布
 \[
 \pi_{\text{Rectify}}(\rvz_0,\rvz_1)
 = p_{\text{src}}(\rvz_0) \delta \big(\rvz_1-\bPhi_{0\to 1}(\rvz_0)\big).
 \]
-We have two immediate consequences:
+我们立即得到两条推论：
 \begin{itemize}
-    \item \textbfs{Source Marginal is Preserved:} 
+    \item \textbfs{源边缘得以保持：}
     $\displaystyle \int \pi_{\text{Rectify}}(\rvz_0,\rvz_1) \diff \rvz_1
-    = p_{\text{src}}(\rvz_0)$.
-    \item \textbfs{Pushforward Along the Flow:} 
-    $\displaystyle (\bPhi_{0\to t})_{\#}p_{\text{src}}=\mathrm{Law}(\rvz(t))$, i.e., the time–$t$ distribution is the pushforward of $p_{\text{src}}$ by $\bPhi_{0\to t}$.
+    = p_{\text{src}}(\rvz_0)$。
+    \item \textbfs{沿流的前推送：}
+    $\displaystyle (\bPhi_{0\to t})_{\#}p_{\text{src}}=\mathrm{Law}(\rvz(t))$，即时刻 $t$ 的分布是 $p_{\text{src}}$ 经 $\bPhi_{0\to t}$ 的前推送。
 \end{itemize}
-If $\rvv_{\bphi^\times}$ matches the oracle drift of a given reference path $\rvx_t$, then all intermediate marginals coincide:
+若 $\rvv_{\bphi^\times}$ 匹配给定参考路径 $\rvx_t$ 的神谕漂移项，则所有中间边缘都重合：
 \[
-\mathrm{Law}(\rvz(t))=\mathrm{Law}(\rvx_t),\quad \text{for all }t\in[0,1],
-\quad\text{and}\quad
+\mathrm{Law}(\rvz(t))=\mathrm{Law}(\rvx_t),\quad \text{对所有 }t\in[0,1],
+\quad\text{且}\quad
 (\bPhi_{0\to 1})_{\#}p_{\mathrm{src}}=p_{\mathrm{tgt}}.
 \]
 
 
-\paragraph{Summary.}
-Rectification replaces noisy independent pairings with smooth teacher-guided trajectories, lowering variance, easing optimization, and improving samples. The idea covers canonical linear paths $\rvx_t=(1-t)\rvx_0+t\rvx_1$ and general affine forms $\rvx_t=a_t\rvx_0+b_t\rvx_1$.
+\paragraph{小结。}
+整流把含噪的独立配对替换为平滑的、教师引导的轨迹，从而降低方差、简化优化并改善样本。这一想法既适用于典范线性路径 $\rvx_t=(1-t)\rvx_0+t\rvx_1$，也适用于一般的仿射形式 $\rvx_t=a_t\rvx_0+b_t\rvx_1$。
 
-For the canonical path, repeatedly applying \texttt{Rectify} (``\emph{\texttt{Reflow}}'') further straightens trajectories without increasing transport cost, making training still easier.
-
-
+对于典范路径，反复施加 \texttt{Rectify}（即"\emph{\texttt{Reflow}}"）会在不增加输运代价的前提下进一步拉直轨迹，使训练变得更加容易。
 
 
-\subsection{\texttt{Reflow}: Iteratively Straightening Flows}\label{subsec:reflow-def}
 
-\paragraph{Why \texttt{Reflow}?}
-Independent pairings often induce irregular and meandering ODE trajectories between $p_{\text{src}}$ and $p_{\text{tgt}}$, which increase discretization error and variance during simulation. This raises a natural question:
+
+\subsection{\texttt{Reflow}：迭代地拉直流}\label{subsec:reflow-def}
+
+\paragraph{为何要 \texttt{Reflow}？}
+独立配对常常在 $p_{\text{src}}$ 与 $p_{\text{tgt}}$ 之间诱导出不规则且蜿蜒的 ODE 轨迹，这会增加仿真过程中的离散化误差和方差。这引出一个自然的问题：
 
 \begin{question}\label{ques:straight}
-Can we learn couplings that induce transport paths that are closer to straight lines between the two distributions, while still preserving the correct marginals?
+我们能否学到这样的耦合，使它所诱导的输运路径更接近两个分布之间的直线，同时仍保持正确的边缘？
 \end{question}
 
-This motivates \emph{\texttt{Reflow}}: repeatedly apply \texttt{Rectify} to update the coupling so that successive flows become easier to integrate.
+这就激发了 \emph{\texttt{Reflow}}：反复施加 \texttt{Rectify} 来更新耦合，使后续的流越来越容易积分。
 
-\paragraph{Core Idea: Recursive Straightening via \texttt{Rectify}.}
-Start from the canonical interpolation on the product coupling $\pi^{(0)}:=p_{\text{src}}(\rvx_0)p_{\text{tgt}}(\rvx_1)$,
+\paragraph{核心思想：通过 \texttt{Rectify} 递归地拉直。}
+从乘积耦合 $\pi^{(0)}:=p_{\text{src}}(\rvx_0)p_{\text{tgt}}(\rvx_1)$ 上的典范插值出发，
 \[
 \rvx_t = (1-t) \rvx_0 + t \rvx_1.
 \]
-Applying \texttt{Rectify} replaces the independent pairing with a dependent one $(\rvz_0,\hat\rvz_1)$, which empirically induces \emph{lower-curvature} trajectories under the learned field. Iterating this update progressively reduces path curvature (never forcing literal straight lines), improving numerical stability and alignment.
+施加 \texttt{Rectify} 会把独立配对替换为相依配对 $(\rvz_0,\hat\rvz_1)$，经验上它会在所学到的速度场下诱导出\emph{更低曲率}的轨迹。迭代这一更新会逐步降低路径曲率（绝不是强行得到字面意义上的直线），从而改善数值稳定性与对齐程度。
 
-\paragraph{The \texttt{Reflow} Procedure.}
-Each iteration performs two steps:
+\paragraph{\texttt{Reflow} 流程。}
+每次迭代执行两步：
 \begin{itemize} 
-    \item \textbfs{Re-Fit Flow:} Train a new velocity field from samples of the current coupling: \begin{align} \bm{\phi}_{k+1} &= \arg\min_{\bm{\phi}} \mathcal{L}\left(\bm{\phi}\Big\vert \pi^{(k)}\right), \quad \text{where} \notag \\ \mathcal{L}\left(\bm{\phi}\Big\vert \pi^{(k)}\right) &:= \mathbb{E}_{t, (\rvz_0^{(k)}, \hat\rvz_1^{(k)})\sim \pi^{(k)}} \left[\left\|\rvv_{\bm{\phi}}(\rvz_t, t) - (\hat\rvz_1^{(k)} - \rvz_0^{(k)})\right\|^2\right] \label{eq:reflow-loss} \end{align} with $\rvz_t = t \rvz_0^{(k)} + (1 - t) \hat\rvz_1^{(k)}$. 
-    \item \textbfs{Generate New Coupling:} Solve the learned ODE starting from new source samples $\rvz_0^{(k+1)} \sim p_{\text{src}}$: \[ \hat\rvz_1^{(k+1)} \gets \rvz_0^{(k+1)} + \int_0^1 \rvv_{\bm{\phi}_{k+1}}(\rvz(t), t) \mathrm{d}t, \] and define the updated coupling: \[ \pi^{(k+1)}(\rvz_0, \rvz_1) := p_{\text{src}}(\rvz_0) \delta\left(\rvz_1 - \hat\rvz_1^{(k+1)}\right). \] \end{itemize}
-In other words, \texttt{Reflow} can be viewed as repeatedly applying the \texttt{Rectify} operator, producing a sequence of progressively refined couplings:
+    \item \textbfs{重拟合流：} 从当前耦合的样本出发训练一个新的速度场：\begin{align} \bm{\phi}_{k+1} &= \arg\min_{\bm{\phi}} \mathcal{L}\left(\bm{\phi}\Big\vert \pi^{(k)}\right), \quad \text{其中} \notag \\ \mathcal{L}\left(\bm{\phi}\Big\vert \pi^{(k)}\right) &:= \mathbb{E}_{t, (\rvz_0^{(k)}, \hat\rvz_1^{(k)})\sim \pi^{(k)}} \left[\left\|\rvv_{\bm{\phi}}(\rvz_t, t) - (\hat\rvz_1^{(k)} - \rvz_0^{(k)})\right\|^2\right] \label{eq:reflow-loss} \end{align} 其中 $\rvz_t = t \rvz_0^{(k)} + (1 - t) \hat\rvz_1^{(k)}$。 
+    \item \textbfs{生成新耦合：} 从新的源样本 $\rvz_0^{(k+1)} \sim p_{\text{src}}$ 出发求解所学到的 ODE：\[ \hat\rvz_1^{(k+1)} \gets \rvz_0^{(k+1)} + \int_0^1 \rvv_{\bm{\phi}_{k+1}}(\rvz(t), t) \mathrm{d}t, \] 并定义更新后的耦合：\[ \pi^{(k+1)}(\rvz_0, \rvz_1) := p_{\text{src}}(\rvz_0) \delta\left(\rvz_1 - \hat\rvz_1^{(k+1)}\right). \] \end{itemize}
+换言之，\texttt{Reflow} 可视为反复施加 \texttt{Rectify} 算子，产生一系列逐步精修的耦合：
 \begin{align}\label{eq:rectify-op}
     \pi^{(k+1)} = \texttt{Rectify} \left(\pi^{(k)}\right)
 \end{align}
-so that both the flow and the coupling evolve together, yielding progressively more stable transport paths.
+从而使流与耦合一同演化，得到越来越稳定的输运路径。
 
 
 
-\subsection{Properties of \texttt{Reflow}}\label{subsec:reflow-properties}
+\subsection{\texttt{Reflow} 的性质}\label{subsec:reflow-properties}
 
-Two key theoretical properties drive the usefulness of \texttt{Reflow}: it reduces transport cost and it straightens the trajectories.
+两条关键的理论性质支撑了 \texttt{Reflow} 的有效性：它降低输运代价，并拉直轨迹。
 
-\paragraph{I. \texttt{Reflow} Never Increases Transport Cost.}
-Let $c(\rvy)$ be a convex cost function (e.g., $\|\rvy\|_2^p$ with $p \geq 1$). Each \texttt{Rectify} step forms a new coupling $(\rvz_0, \hat\rvz_1)$ whose cost is no worse than the original:
-\proppp{\texttt{Rectify} May Reduce Transport Costs}{rec-transport-cost}{
-Assuming an ideal velocity field $\rvv^* = \rvv_{\bm{\phi}^\times}$, we have:
+\paragraph{I. \texttt{Reflow} 永不增加输运代价。}
+设 $c(\rvy)$ 是一个凸代价函数（例如 $\|\rvy\|_2^p$，其中 $p \geq 1$）。每一次 \texttt{Rectify} 步骤都形成一个新耦合 $(\rvz_0, \hat\rvz_1)$，其代价不劣于原来的：
+\proppp{\texttt{Rectify} 可能降低输运代价}{rec-transport-cost}{
+假设速度场是理想的，即 $\rvv^* = \rvv_{\bm{\phi}^\times}$，则有：
 \[
 \mathbb{E}\left[c\left(\hat\rvz_1 - \rvz_0\right)\right] \leq \mathbb{E}\left[c\left(\rvx_1 - \rvx_0\right)\right].
 \]
-}{Follows from Jensen's inequality. See \citet{liu2022flow} for a full derivation.}
-Applying this result recursively shows that the \texttt{Reflow} process does not increase the transport cost.
+}{由 Jensen 不等式可得。完整推导见 \citet{liu2022flow}。}
+递归地应用这一结果表明，\texttt{Reflow} 过程不会增加输运代价。
 
-\paragraph{II. \texttt{Reflow} Straightens the Path.}
-The longer we iterate \texttt{Reflow}, the straighter the learned trajectories may become. To measure this, define the \emph{straightness functional} of a path $\mathbf{Y} = \{\rvy_t\}_{t\in[0,1]}$ as
+\paragraph{II. \texttt{Reflow} 拉直路径。}
+我们迭代 \texttt{Reflow} 越久，所学到的轨迹就可能变得越直。为衡量这一点，定义路径 $\mathbf{Y} = \{\rvy_t\}_{t\in[0,1]}$ 的\emph{直性泛函}为
 \[
 \mathcal{S}(\mathbf{Y}) := \int_0^1 \mathbb{E}\left[\left\|\rvy_1 - \rvy_0 - \frac{\mathrm{d}\rvy_t}{\mathrm{d}t} \right\|_2^2 \right]  \mathrm{d}t.
 \]
-If $\mathcal{S}(\mathbf{Y}) = 0$, then $\mathbf{Y}$ is exactly a straight line.
+若 $\mathcal{S}(\mathbf{Y}) = 0$，则 $\mathbf{Y}$ 恰为一条直线。
 
-\proppp{\texttt{Reflow} Straightens the Stochastic Path}{reflow-straight}{
-For rectified paths $\rmZ^{(k)}$, we have:
+\proppp{\texttt{Reflow} 拉直随机路径}{reflow-straight}{
+对整流后的路径 $\rmZ^{(k)}$，有：
 \[
 \min_{k \in \{0,\dots,K\}} \mathcal{S}(\rmZ^{(k)}) \leq \frac{\mathbb{E}\left[\|\rvx_1 - \rvx_0\|^2\right]}{K}.
 \]
-}{See Theorem 3.7 of \citet{liu2022rectified}.}
+}{见 \citet{liu2022rectified} 的定理 3.7。}
 
 \begin{figure}[t]
     \centering
     \includegraphics[width=\textwidth]{Images/PartB/rectified_flow_trained.pdf}
-    \caption{\textbfs{Illustration of \texttt{Reflow}.} Paths become progressively straighter with \texttt{Rectify} procedure.  \figcredit{Adapted from \citet{liu2022flow}.}}
+    \caption{\textbfs{\texttt{Reflow} 示意图。} 路径在 \texttt{Rectify} 过程下逐步变得更直。 \figcredit{改编自 \citet{liu2022flow}。}}
     \label{fig:ill_Reflow}
 \end{figure}
 
 
-The FM or RF formulation with linear interpolation kernels, together with the \texttt{Reflow} procedure, provides a simpler training objective and a practical method for refining stochastic couplings. For theoretical details, we refer readers to \citep{liu2022flow, liu2022rectified}.
+带有线性插值核的 FM 或 RF 表述，连同 \texttt{Reflow} 过程，提供了一种更简单的训练目标，以及一种精修随机耦合的实用方法。关于理论细节，我们建议读者参考 \citep{liu2022flow, liu2022rectified}。
 
 
 
-\paragraph{III. Connection to Optimal Transport.}
-Lastly, we note that straight-line couplings are not necessarily optimal in the sense of optimal transport (OT). This involves some terminology that will be introduced in \Cref{sec:ot-intro}; we therefore refer readers who are not familiar with OT to that section.
+\paragraph{III. 与最优传输的联系。}
+最后，我们指出，直线型耦合在最优传输 (OT) 的意义下未必是最优的。这涉及一些将在 \Cref{sec:ot-intro} 中介绍的术语；因此，我们把不熟悉 OT 的读者指引到该节。
 
-A hallmark of quadratic-cost optimal transport is that particles travel along straight lines: a particle at $\rvx_0$ moves to $\rmT(\rvx_0)$ via $\rvx_t = (1 - t)\rvx_0 + t \rmT(\rvx_0)$, where $\rmT$ is the optimal transport map. However, not every map $\rmS$ generating such straight-line paths, i.e., $\rvx_t = (1 - t)\rvx_0 + t \rmS(\rvx_0)$, is optimal. The map $\rmS$ yields the optimal flow only if it minimizes the Monge cost $\mathbb{E}[\|\rvx_0 - \rmS(\rvx_0)\|^2]$. Thus, while straight-line paths are necessary, they are not sufficient; optimality also depends on the correct endpoint map $\rmT$.
+二次代价最优传输的一个标志是粒子沿直线行进：位于 $\rvx_0$ 的粒子经由 $\rvx_t = (1 - t)\rvx_0 + t \rmT(\rvx_0)$ 移动到 $\rmT(\rvx_0)$，其中 $\rmT$ 是最优传输映射。然而，并非每个生成此类直线路径的映射 $\rmS$，即 $\rvx_t = (1 - t)\rvx_0 + t \rmS(\rvx_0)$，都是最优的。仅当映射 $\rmS$ 最小化 Monge 代价 $\mathbb{E}[\|\rvx_0 - \rmS(\rvx_0)\|^2]$ 时，它才给出最优流。因此，尽管直线路径是必要条件，但并不充分；最优性还依赖于正确的端点映射 $\rmT$。
 
-\exm{Straight Couplings Need Not Be Optimal}{
-Let $p_{\text{src}} = p_{\text{tgt}} = \mathcal{N}(\bm{0}, \rmI)$. For the cost $c(\rvx, \rvy) = \|\rvx - \rvy\|^p$ with $p > 0$, the $c$-optimal coupling is the identity coupling $\pi^{*}$, where $\pi^{*}$ is the law of $(\rvx, \rvx)$ with $\rvx \sim p_{\text{src}}$.
+\exm{直线耦合未必最优}{
+令 $p_{\text{src}} = p_{\text{tgt}} = \mathcal{N}(\bm{0}, \rmI)$。对于代价 $c(\rvx, \rvy) = \|\rvx - \rvy\|^p$（$p > 0$），$c$-最优耦合是恒等耦合 $\pi^{*}$，其中 $\pi^{*}$ 是 $(\rvx, \rvx)$ 的法则，$\rvx \sim p_{\text{src}}$。
 
-Now consider the coupling $\pi_{\rmA}$ defined as the law of $(\rvx, \rmA \rvx)$, where $\rvx \sim p_{\text{src}}$ and $\rmA$ is a rotation matrix satisfying $\rmA^\top \rmA = \rmI$, $\det(\rmA) = 1$, $\rmA \neq \rmI$, and $-1$ is not an eigenvalue. Then $\pi_{\rmA}$ is a valid coupling of $p_{\text{src}}$ and $p_{\text{tgt}}$, and corresponds to straight-line paths between $\rvx$ and $\rmA \rvx$, but it is not $c$-optimal for any twice-differentiable strictly convex cost $c$ with invertible Hessian. The suboptimality arises from the rotational transformation. As discussed in \Cref{eq:reflow-loss-gradient}, even removing the rotation may not lead to an optimal coupling.
+现在考虑定义为 $(\rvx, \rmA \rvx)$ 之法则的耦合 $\pi_{\rmA}$，其中 $\rvx \sim p_{\text{src}}$，$\rmA$ 是满足 $\rmA^\top \rmA = \rmI$、$\det(\rmA) = 1$、$\rmA \neq \rmI$ 且 $-1$ 不是其特征值的旋转矩阵。则 $\pi_{\rmA}$ 是 $p_{\text{src}}$ 与 $p_{\text{tgt}}$ 之间的一个合法耦合，对应于 $\rvx$ 与 $\rmA \rvx$ 之间的直线路径，但对于任何二阶可微、严格凸且 Hesse 矩阵可逆的代价 $c$，它都不是 $c$-最优的。这种次优性源于旋转变换。如 \Cref{eq:reflow-loss-gradient} 中所讨论，即便消去旋转，也未必能得到最优耦合。
 }
 
-We will continue exploring the connection to OT in \Cref{subsec:ot-linear-reflow}.
+我们将在 \Cref{subsec:ot-linear-reflow} 中继续探讨与 OT 的联系。
 
 \clearpage
 \newpage
 
 \newpage
-\section{Closing Remarks}\label{sec:ch5_cr}
-     
-This chapter has illuminated the third and final foundational perspective on diffusion models, one rooted in the principles of deterministic flows. Our exploration began with Normalizing Flows (NFs), which leverage the change-of-variables formula to learn an exact, invertible mapping between a simple prior and the data distribution. We then saw this concept evolve into a continuous-time process with Neural ODEs, where a learned velocity field governs the transformation. However, this approach comes with the significant drawback of requiring costly ODE simulations within the training loop.
+\section{结语}\label{sec:ch5_cr}
+      
+本章阐明了关于扩散模型的第三个、也是最后一个基础视角，它根植于确定性流的原理。我们的探索始于归一化流 (NFs)，它利用变量替换公式学习一个简单先验与数据分布之间的精确、可逆映射。随后我们看到这一概念在神经 ODE 中演化为连续时间过程，由所学到的速度场支配这一变换。然而，这种方法有一个显著的缺点：它要求在训练循环中进行代价高昂的 ODE 仿真。
+
+
+
+
+作为对这一挑战的优雅而高效的解决方案，我们介绍了流匹配 (FM) 这一现代框架。通过预先定义一条概率路径 $\{p_{t}\}_t$ 及满足连续性方程的相应速度场，FM 为 ODE 流确立了明确的目标。至关重要的是，正如我们在变分视角与基于得分函数的视角中所见，FM 也采用了一种强大的条件化技巧。它把匹配边缘速度场这一难解问题转化为对一个已知条件速度的简单且可计算的回归，使训练完全无需仿真。这一视角把扩散模型本身重新刻画为学习一个确定性流、把高斯先验输运到数据分布的一个特例。
 
 
 
 
 
-The modern framework of Flow Matching (FM) was presented as an elegant and efficient solution to this challenge. By pre-defining a probability path $\{p_{t}\}_t$ and a corresponding velocity field that satisfies the continuity equation, FM establishes a clear target for the ODE flow. Crucially, just as we saw in the variational and score-based views, FM employs a powerful conditioning trick. This transforms the intractable problem of matching the marginal velocity field into a simple and tractable regression against a known conditional velocity, making training entirely simulation-free. This perspective recasts diffusion models themselves as a special case of learning a deterministic flow to transport a Gaussian prior to the data distribution.
 
+随着基于流的视角的引入，我们对扩散建模三根概念支柱的巡礼至此完成。在这一旅程中，一个引人注目的模式浮现出来：每一种框架，无论其起源于 VAE、EBM 还是 NF，都收敛到了一种连续时间生成过程，并都依赖于一种条件化策略以实现可计算的学习。
 
-
-
-With the introduction of the flow-based view, our survey of the three conceptual pillars of diffusion modeling is now complete. Throughout this journey, a remarkable pattern has emerged: each framework, despite its unique origins in VAEs, EBMs, or NFs, has converged on a continuous-time generative process and has relied on a conditioning strategy to enable tractable learning.
-
-In the next chapter, we will finally synthesize these parallel threads into a single, unified framework. We will:
+在下一章中，我们将最终把这些并行的线索综合为单一的统一框架。我们将：
 \begin{enumerate}
-    \item Formally demonstrate that the variational, score-based, and flow-based perspectives are not merely analogous but are mathematically equivalent at a fundamental level.
-    \item Show how the Fokker-Planck equation serves as the universal law governing density evolution across all three views, revealing that they are simply different lenses for describing the same core generative principle.
+    \item 正式证明变分视角、基于得分函数的视角与基于流的视角之间并非仅仅是类比，而是在根本层面上数学等价的。
+    \item 说明 Fokker-Planck 方程如何作为支配所有三种视角下密度演化的普适定律，揭示出它们只不过是描述同一核心生成原理的不同视角。
 \end{enumerate}
 
-This unified lens will provide a complete and systematic understanding of the modern diffusion paradigm. 
-
-
+这一统一的视角将为现代扩散范式提供完整而系统的理解。
 
